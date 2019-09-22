@@ -1,5 +1,3 @@
-// Don't take credits for this ;) Joplin / Manhhao are the first uploaders ;)
-
 //#define AYY_DEBUG
 
 // General shit
