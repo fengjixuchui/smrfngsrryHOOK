@@ -1,4 +1,4 @@
-// Don't take credits for this ;) Joplin / Manhhao are the first uploaders ;)
+
 
 #include "RageBot.h"
 #include "RenderManager.h"

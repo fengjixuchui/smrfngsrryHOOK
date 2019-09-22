@@ -1,4 +1,4 @@
-// Don't take credits for this ;) Joplin / Manhhao are the first uploaders ;)
+
 
 // Credits to Valve and Shad0w
 #include "Interfaces.h"
