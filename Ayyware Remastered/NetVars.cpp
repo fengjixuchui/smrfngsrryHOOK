@@ -1,23 +1,23 @@
+
+
 // Credits to Valve and Shad0w
-#define _CRT_SECURE_NO_WARNINGS
 
 #include "NetVars.h"
-#include "Valve/ClientRecvProps.h"
-#include "Valve/CRC32.h"
-#include "Interfaces.h"
+#include "ClientRecvProps.h"
+#include "CRC32.h"
+#include "Utilities.h"
 
-#define ALIGN_SIZE 8
+#include "SDK.h"
 
-CNetVars NetVars;
+using namespace std;
 
-//
-// Shitty string filler for dumping neatly
-//
+CNetVar NetVar;
+
 const char* AlignText(int align)
 {
 	static char buffer[256];
 	int i = 0;
-	for (i = 0; i < (align*ALIGN_SIZE); i++)
+	for (i = 0; i < align; i++)
 	{
 		buffer[i] = ' ';
 	}
@@ -25,80 +25,108 @@ const char* AlignText(int align)
 	return buffer;
 }
 
-//
-// Starts processing all of the classes and netvars, storing their hashes
-//
-void CNetVars::Initialize()
+void CNetVar::RetrieveClasses()
 {
-	freopen("netv2.txt", "w", stdout);
-	ClientClass* pClass = Interfaces::Client->GetAllClasses();
+#ifdef DUMP_NETVARS_TO_FILE
+	U::EnableLogFile(NETVAR_FILENAME);
+#endif
 
-	if (!pClass)
+	ClientClass *clientClass = Interfaces::Client->GetAllClasses();
+
+	if (!clientClass)
 		return;
 
-	// Itterate through all of the classes
-	while (pClass)
+	//Clear netvar vector incase of another call, not necesarry as it doesnt add duplicates
+
+	vars.clear();
+
+	while (clientClass != 0)
 	{
-		if (!pClass)
+		if (clientClass == 0)
 			break;
 
-		AddRecursive(pClass->m_pRecvTable, 0);
+		LogNetVar(clientClass->m_pRecvTable, 0);
 
-		pClass = pClass->m_pNext;
+		clientClass = clientClass->m_pNext;
 	}
-	freopen("CONOUT$", "w", stdout);
 }
 
-//
-// CRC's and adds all the tables netvars, and recursively does the same for any children
-//
-void CNetVars::AddRecursive(RecvTable *pTable, int level)
+void CNetVar::LogNetVar(RecvTable *table, int align)
 {
-	if (pTable->m_nProps <= 0)
+	if (table->m_nProps < 0)
 		return;
 
 #ifdef DUMP_NETVARS_TO_FILE
-	if (level)
-		printf("%s[Start of %s]\n", AlignText(level+1), pTable->m_pNetTableName);
+	if (align)
+		U::Log("%s===%s===", AlignText(20 + align), table->m_pNetTableName);
 	else
-		printf("%s\n", pTable->m_pNetTableName);
+		U::Log(table->m_pNetTableName);
 #endif
 
-	for (auto i = 0; i < pTable->m_nProps; ++i)
+	for (auto i = 0; i < table->m_nProps; ++i)
 	{
-		RecvProp* pProp = &pTable->m_pProps[i];
-		if(!pProp) return;
+		RecvProp *prop = &table->m_pProps[i];
 
-		char szCRCBuffer[256];
-		sprintf_s(szCRCBuffer, "%s%s", pTable->m_pNetTableName, pProp->m_pVarName);
-		DWORD dwCRC = CRC32(szCRCBuffer, strlen(szCRCBuffer));
+		if (!prop)
+			continue;
+
+		char szCRC32[150];
+
+		sprintf_s(szCRC32, "%s%s", table->m_pNetTableName, prop->m_pVarName);
+
+		DWORD_PTR dwCRC32 = CRC32((void*)szCRC32, strlen(szCRC32));
 
 #ifdef DUMP_NETVARS_TO_FILE
-		printf("%s%s [ 0x%x ] [ CRC: 0x%x ]\n", AlignText(level+1), pProp->m_pVarName, pProp->m_Offset, dwCRC);
+		U::Log("%s%s [0x%X] [CRC32::0x%X]", AlignText(15 + align), prop->m_pVarName, prop->m_Offset, dwCRC32);
 #endif
-		NetvarHashes[dwCRC] = pProp->m_Offset;
 
-		if(pProp->m_pDataTable)
-			AddRecursive(pProp->m_pDataTable, level+1);
+		//Dont add duplicates
+
+		bool bAddNetVar = true;
+
+		for (auto netvar = 0; netvar < (int)vars.size(); ++netvar)
+		{
+			netvar_info_s *netvars = &vars[netvar];
+
+			if (netvars->dwCRC32 == dwCRC32)
+				bAddNetVar = false;
+
+#ifdef DUMP_NETVARS_TO_FILE
+
+			if (netvars->dwCRC32 == dwCRC32 && netvars->dwOffset != prop->m_Offset) //just a test if any crc collide with another (didnt happen obviously)
+			{
+				U::Log("^^^^ ERROR HASH %s%s::%s [0x%X] [CRC32::0x%X] ^^^^", AlignText(15 + align), table->m_pNetTableName, prop->m_pVarName, prop->m_Offset, dwCRC32);
+				U::Log("^^^^ CONFLICT %s%s::%s [0x%X] [CRC32::0x%X] ^^^^", AlignText(15 + align), netvars->szTableName, netvars->szPropName, netvars->dwOffset, netvars->dwCRC32);
+			}
+#endif
+		}
+
+		if (bAddNetVar) //avoid adding duplicates (faster lookup)
+		{
+			netvar_info_s tmp;
+#ifdef DUMP_NETVARS_TO_FILE
+			strcpy_s(tmp.szTableName, table->m_pNetTableName);
+			strcpy_s(tmp.szPropName, prop->m_pVarName);
+#endif
+			tmp.dwCRC32 = dwCRC32;
+
+			tmp.dwOffset = prop->m_Offset;
+
+			vars.push_back(tmp);
+		}
+
+		if (prop->m_pDataTable)
+			LogNetVar(prop->m_pDataTable, 5);
 	}
-
-#ifdef DUMP_NETVARS_TO_FILE
-	if (level)
-		printf("%s[End of %s]\n", AlignText(level + 1), pTable->m_pNetTableName);
-#endif
 }
 
-//
-// Use this to get the offset of the netvar you want
-//
-DWORD CNetVars::GetOffset(DWORD dwCRC32)
+DWORD_PTR CNetVar::GetNetVar(DWORD_PTR dwCRC32) //returns 0xFFFFFFFF (-1) if not found (ex: if(GetNetVar(0xD34DB33F)==-1) return false;
 {
-	if (NetvarHashes.find(dwCRC32) == NetvarHashes.end())
+	for (auto i = 0; i < (int)vars.size(); ++i)
 	{
-		return 0;
+		if (vars[i].dwCRC32 == dwCRC32)
+			return vars[i].dwOffset;
 	}
-	else
-	{
-		return NetvarHashes[dwCRC32];
-	}
+
+	return 0xFFFFFFFF;
 }

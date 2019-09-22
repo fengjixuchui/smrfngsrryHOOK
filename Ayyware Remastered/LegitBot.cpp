@@ -1,12 +1,10 @@
-/*
-Syn's AyyWare Framework 2015
-*/
+// Don't take credits for this ;) Joplin / Manhhao are the first uploaders ;)
 
 #include "LegitBot.h"
-#include "Render.h"
-#include "Menu.h"
+#include "RenderManager.h"
+#include <iostream>
 
-void CLegitBot::Setup()
+void CLegitBot::Init()
 {
 	IsLocked = false;
 	TargetID = -1;
@@ -17,49 +15,37 @@ void CLegitBot::Draw()
 	
 }
 
-void CLegitBot::Move(CUserCmd *pCmd)
+void CLegitBot::Move(CUserCmd *pCmd, bool &bSendPacket)
 {
+	// Master switch
+	if (!Menu::Window.LegitBotTab.Active.GetState())
+		return;
+
 	// Aimbot
 	if (Menu::Window.LegitBotTab.AimbotEnable.GetState())
-		DoAimbot(pCmd);
+		DoAimbot(pCmd, bSendPacket);
+
+	// Triggerbot
+	if (Menu::Window.LegitBotTab.TriggerEnable.GetState() && (!Menu::Window.LegitBotTab.TriggerKeyPress.GetState() || GUI.GetKeyState(Menu::Window.LegitBotTab.TriggerKeyBind.GetKey())))
+		DoTrigger(pCmd);
 }
 
 void CLegitBot::SyncWeaponSettings()
 {
-	IClientEntity* pLocal = HackManager.pLocal();
+	std::vector<int> HitBoxesToScan;
+	IClientEntity* pLocal = hackManager.pLocal();
 	CBaseCombatWeapon* pWeapon = (CBaseCombatWeapon*)Interfaces::EntList->GetClientEntityFromHandle(pLocal->GetActiveWeaponHandle());
 
 	if (!pWeapon)
 		return;
 
-	int ModKey = Menu::Window.LegitBotTab.ModKey.GetKey();
-	if (ModKey >= 0 && GUI.GetKeyState(ModKey))
-	{
-		Speed = Menu::Window.LegitBotTab.ModSpeed.GetValue();
-		FoV = Menu::Window.LegitBotTab.ModFoV.GetValue();
-		switch (Menu::Window.LegitBotTab.ModHitbox.GetIndex())
-		{
-		case 0:
-			HitBox = ((int)CSGOHitboxID::Head);
-			break;
-		case 1:
-			HitBox = ((int)CSGOHitboxID::Neck);
-			break;
-		case 2:
-			HitBox = ((int)CSGOHitboxID::Chest);
-			break;
-		case 3:
-			HitBox = ((int)CSGOHitboxID::Stomach);
-			break;
-		}
-		return;
-	}
-
-	if (IsPistol(pWeapon))
+	if (GameUtils::IsPistol(pWeapon))
 	{
 		Speed = Menu::Window.LegitBotTab.WeaponPistSpeed.GetValue();
 		FoV = Menu::Window.LegitBotTab.WeaponPistFoV.GetValue();
 		RecoilControl = Menu::Window.LegitBotTab.WeaponPistRecoil.GetState();
+		PSilent = Menu::Window.LegitBotTab.WeaponPistPSilent.GetState();
+		Inacc = Menu::Window.LegitBotTab.WeaponPistInacc.GetValue();
 
 		switch (Menu::Window.LegitBotTab.WeaponPistHitbox.GetIndex())
 		{
@@ -77,11 +63,13 @@ void CLegitBot::SyncWeaponSettings()
 			break;
 		}
 	}
-	else if (IsSniper(pWeapon))
+	else if (GameUtils::IsSniper(pWeapon))
 	{
 		Speed = Menu::Window.LegitBotTab.WeaponSnipSpeed.GetValue();
 		FoV = Menu::Window.LegitBotTab.WeaponSnipFoV.GetValue();
 		RecoilControl = Menu::Window.LegitBotTab.WeaponSnipRecoil.GetState();
+		PSilent = Menu::Window.LegitBotTab.WeaponSnipPSilent.GetState();
+		Inacc = Menu::Window.LegitBotTab.WeaponSnipInacc.GetValue();
 
 		switch (Menu::Window.LegitBotTab.WeaponSnipHitbox.GetIndex())
 		{
@@ -104,6 +92,8 @@ void CLegitBot::SyncWeaponSettings()
 		Speed = Menu::Window.LegitBotTab.WeaponMainSpeed.GetValue();
 		FoV = Menu::Window.LegitBotTab.WeaponMainFoV.GetValue();
 		RecoilControl = Menu::Window.LegitBotTab.WeaponMainRecoil.GetState();
+		PSilent = Menu::Window.LegitBotTab.WeaponMainPSilent.GetState();
+		Inacc = Menu::Window.LegitBotTab.WeaponMainInacc.GetValue();
 
 		switch (Menu::Window.LegitBotTab.WeaponMainHitbox.GetIndex())
 		{
@@ -124,10 +114,10 @@ void CLegitBot::SyncWeaponSettings()
 }
 
 // Functionality
-void CLegitBot::DoAimbot(CUserCmd *pCmd)
+void CLegitBot::DoAimbot(CUserCmd *pCmd, bool &bSendPacket)
 {
 	IClientEntity* pTarget = nullptr;
-	IClientEntity* pLocal = HackManager.pLocal();
+	IClientEntity* pLocal = hackManager.pLocal();
 	bool FindNewTarget = true;
 	//IsLocked = false;
 
@@ -135,7 +125,7 @@ void CLegitBot::DoAimbot(CUserCmd *pCmd)
 	CBaseCombatWeapon* pWeapon = (CBaseCombatWeapon*)Interfaces::EntList->GetClientEntityFromHandle(pLocal->GetActiveWeaponHandle());
 	if (pWeapon)
 	{
-		if (pWeapon->GetAmmoInClip() == 0 || !IsBallisticWeapon(pWeapon))
+		if (pWeapon->GetAmmoInClip() == 0 || !GameUtils::IsBallisticWeapon(pWeapon))
 		{
 			//TargetID = 0;
 			//pTarget = nullptr;
@@ -199,11 +189,8 @@ void CLegitBot::DoAimbot(CUserCmd *pCmd)
 		// Key
 		if (Menu::Window.LegitBotTab.AimbotKeyPress.GetState())
 		{
-			int ModKey = Menu::Window.LegitBotTab.ModKey.GetKey();
-			bool ModKeyDown = (ModKey >= 0 && GUI.GetKeyState(ModKey));
-			
 			int Key = Menu::Window.LegitBotTab.AimbotKeyBind.GetKey();
-			if (Key >= 0 && !GUI.GetKeyState(Key) && !ModKeyDown)
+			if (Key >= 0 && !GUI.GetKeyState(Key))
 			{
 				TargetID = -1;
 				pTarget = nullptr;
@@ -214,7 +201,7 @@ void CLegitBot::DoAimbot(CUserCmd *pCmd)
 
 		Vector AimPoint = GetHitboxPosition(pTarget, HitBox);
 
-		if (AimAtPoint(pLocal, AimPoint, pCmd))
+		if (AimAtPoint(pLocal, AimPoint, pCmd, bSendPacket))
 		{
 			//IsLocked = true;
 			if (Menu::Window.LegitBotTab.AimbotAutoFire.GetState() && !(pCmd->buttons & IN_ATTACK))
@@ -226,25 +213,25 @@ void CLegitBot::DoAimbot(CUserCmd *pCmd)
 
 	// Auto Pistol
 	static bool WasFiring = false;
-	CSWeaponInfo* WeaponInfo = pWeapon->GetCSWpnData();
-	if (!WeaponInfo->m_IsFullAuto && Menu::Window.LegitBotTab.AimbotAutoPistol.GetState())
+	if (GameUtils::IsPistol(pWeapon) && Menu::Window.LegitBotTab.AimbotAutoPistol.GetState())
 	{
 		if (pCmd->buttons & IN_ATTACK)
 		{
+			static bool WasFiring = false;
+			WasFiring = !WasFiring;
+
 			if (WasFiring)
 			{
 				pCmd->buttons &= ~IN_ATTACK;
 			}
 		}
-
-		WasFiring = pCmd->buttons & IN_ATTACK ? true : false;
 	}
 }
 
-bool CLegitBot::TargetMeetsRequirements(IClientEntity* pEntity)
+bool TargetMeetsTriggerRequirements(IClientEntity* pEntity)
 {
 	// Is a valid player
-	if (pEntity && pEntity->IsDormant() == false && pEntity->IsAlive() && pEntity->GetIndex() != HackManager.pLocal()->GetIndex())
+	if (pEntity && pEntity->IsDormant() == false && pEntity->IsAlive() && pEntity->GetIndex() != hackManager.pLocal()->GetIndex())
 	{
 		// Entity Type checks
 		ClientClass *pClientClass = pEntity->GetClientClass();
@@ -252,10 +239,10 @@ bool CLegitBot::TargetMeetsRequirements(IClientEntity* pEntity)
 		if (pClientClass->m_ClassID == (int)CSGOClassID::CCSPlayer && Interfaces::Engine->GetPlayerInfo(pEntity->GetIndex(), &pinfo))
 		{
 			// Team Check
-			if (pEntity->GetTeamNum() != HackManager.pLocal()->GetTeamNum())
+			if (pEntity->GetTeamNum() != hackManager.pLocal()->GetTeamNum() || Menu::Window.LegitBotTab.AimbotFriendlyFire.GetState())
 			{
 				// Spawn Check
-				if (!pEntity->HasGunGameImmunity() && IsVisible(HackManager.pLocal(), pEntity, HitBox))
+				if (!pEntity->HasGunGameImmunity())
 				{
 					return true;
 				}
@@ -267,8 +254,107 @@ bool CLegitBot::TargetMeetsRequirements(IClientEntity* pEntity)
 	return false;
 }
 
+void CLegitBot::DoTrigger(CUserCmd *pCmd)
+{
+	IClientEntity* pLocal = hackManager.pLocal();
+
+	// Don't triggerbot with the knife..
+	CBaseCombatWeapon* pWeapon = (CBaseCombatWeapon*)Interfaces::EntList->GetClientEntityFromHandle(pLocal->GetActiveWeaponHandle());
+	if (pWeapon)
+	{
+		if (pWeapon->GetAmmoInClip() == 0 || !GameUtils::IsBallisticWeapon(pWeapon))
+		{
+			return;
+		}
+	}
+	else
+		return;
+
+	// Triggerbot
+	// Get the view with the recoil
+	Vector ViewAngles;
+	Interfaces::Engine->GetViewAngles(ViewAngles);
+	ViewAngles += pLocal->localPlayerExclusive()->GetAimPunchAngle() * 2.f;
+
+	// Build a ray going fowards at that angle
+	Vector fowardVec;
+	AngleVectors(ViewAngles, &fowardVec);
+	fowardVec *= 10000;
+
+	// Get ray start / end
+	Vector start = pLocal->GetOrigin() + pLocal->GetViewOffset();
+	Vector end = start + fowardVec, endScreen;
+
+	trace_t Trace;
+	UTIL_TraceLine(start, end, MASK_SOLID, pLocal, 0, &Trace);
+
+	if (Trace.m_pEnt && 0 < Trace.hitgroup <= 7) // hitbox not hitgroup
+	{
+		if (TargetMeetsTriggerRequirements(Trace.m_pEnt) && !time < Menu::Window.LegitBotTab.TriggerDelay.GetValue())
+		{
+			float time = 0;
+			time++;
+			float delay = Menu::Window.LegitBotTab.TriggerDelay.GetValue() / 1000.f;
+
+			if ((time * 64) < delay)
+			{
+				return;
+			}
+			else
+			{
+				pCmd->buttons |= IN_ATTACK;
+				time = 0;
+			}
+		}
+	}
+
+	// Auto Pistol
+	if (GameUtils::IsPistol(pWeapon) && Menu::Window.LegitBotTab.AimbotAutoPistol.GetState())
+	{
+		if (pCmd->buttons & IN_ATTACK)
+		{
+			static bool WasFiring = false;
+			WasFiring = !WasFiring;
+
+			if (WasFiring)
+			{
+				pCmd->buttons &= ~IN_ATTACK;
+			}
+		}
+	}
+}
+
+bool CLegitBot::TargetMeetsRequirements(IClientEntity* pEntity)
+{
+	// Is a valid player
+	if (pEntity && pEntity->IsDormant() == false && pEntity->IsAlive() && pEntity->GetIndex() != hackManager.pLocal()->GetIndex())
+	{
+		// Entity Type checks
+		ClientClass *pClientClass = pEntity->GetClientClass();
+		player_info_t pinfo;
+		if (pClientClass->m_ClassID == (int)CSGOClassID::CCSPlayer && Interfaces::Engine->GetPlayerInfo(pEntity->GetIndex(), &pinfo))
+		{
+			// Team Check
+			if (pEntity->GetTeamNum() != hackManager.pLocal()->GetTeamNum() || Menu::Window.LegitBotTab.AimbotFriendlyFire.GetState())
+			{
+				// Spawn Check
+				if (!pEntity->HasGunGameImmunity())
+				{
+					if (GameUtils::IsVisible(hackManager.pLocal(), pEntity, HitBox))
+						return true;
+				}
+			}
+		}
+	}
+
+	// They must have failed a requirement
+	return false;
+}
+
 float CLegitBot::FovToPlayer(Vector ViewOffSet, Vector View, IClientEntity* pEntity, int aHitBox)
 {
+	Vector out[9];
+
 	// Anything past 180 degrees is just going to wrap around
 	CONST FLOAT MaxDegrees = 180.0f;
 
@@ -307,7 +393,7 @@ int CLegitBot::GetTargetCrosshair()
 	int target = -1;
 	float minFoV = FoV;
 
-	IClientEntity* pLocal = HackManager.pLocal();
+	IClientEntity* pLocal = hackManager.pLocal();
 	Vector ViewOffset = pLocal->GetOrigin() + pLocal->GetViewOffset();
 	Vector View; Interfaces::Engine->GetViewAngles(View);
 	View += pLocal->localPlayerExclusive()->GetAimPunchAngle() * 2.f;
@@ -333,11 +419,27 @@ int CLegitBot::GetTargetCrosshair()
 	return target;
 }
 
-bool CLegitBot::AimAtPoint(IClientEntity* pLocal, Vector point, CUserCmd *pCmd)
+bool ShouldFire()
+{
+	IClientEntity* pLocalEntity = (IClientEntity*)Interfaces::EntList->GetClientEntity(Interfaces::Engine->GetLocalPlayer());
+	if (!pLocalEntity)
+		return false;
+
+	CBaseCombatWeapon* entwep = (CBaseCombatWeapon*)Interfaces::EntList->GetClientEntityFromHandle(pLocalEntity->GetActiveWeaponHandle());
+
+	float flServerTime = (float)pLocalEntity->GetTickBase() * Interfaces::Globals->interval_per_tick;
+	float flNextPrimaryAttack = entwep->GetNextPrimaryAttack();
+
+	std::cout << flServerTime << " " << flNextPrimaryAttack << std::endl;
+
+	return !(flNextPrimaryAttack > flServerTime);
+}
+
+bool CLegitBot::AimAtPoint(IClientEntity* pLocal, Vector point, CUserCmd *pCmd, bool &bSendPacket)
 {
 	// Get the full angles
 	if (point.Length() == 0) return false;
-	// Don't spam it too fast so you can still do stuff
+
 	static clock_t start_t = clock();
 	double timeSoFar = (double)(clock() - start_t) / CLOCKS_PER_SEC;
 	static Vector Inaccuracy;
@@ -346,17 +448,16 @@ bool CLegitBot::AimAtPoint(IClientEntity* pLocal, Vector point, CUserCmd *pCmd)
 	{
 		Inaccuracy.Init(-50 + rand() % 100, -50 + rand() % 100, -50 + rand() % 100);
 		Inaccuracy.NormalizeInPlace();
-		Inaccuracy *= Menu::Window.LegitBotTab.AimbotInaccuracy.GetValue();
+		Inaccuracy *= Inacc;
 		start_t = clock();
 	}
-	
 	
 	point += Inaccuracy;
 	Vector angles;
 	Vector src = pLocal->GetOrigin() + pLocal->GetViewOffset();
 
 	CalcAngle(src, point, angles);
-	NormaliseViewAngle(angles);
+	GameUtils::NormaliseViewAngle(angles);
 
 	if (angles[0] != angles[0] || angles[1] != angles[1])
 	{
@@ -369,28 +470,57 @@ bool CLegitBot::AimAtPoint(IClientEntity* pLocal, Vector point, CUserCmd *pCmd)
 		if (AimPunch.Length2D() > 0 && AimPunch.Length2D() < 150)
 		{
 			angles -= AimPunch * 2;
-			NormaliseViewAngle(angles);
+			GameUtils::NormaliseViewAngle(angles);
 		}
 	}
 
 	IsLocked = true;
 	//-----------------------------------------------
 
-	Vector shit = angles - pCmd->viewangles;
+	Vector ang = angles - pCmd->viewangles;
 	bool v = false;
 
-	if (shit.Length() > Speed)
+	if (ang.Length() > Speed)
 	{
-		Normalize(shit, shit);
-		shit *= Speed;
+		Normalize(ang, ang);
+		ang *= Speed;
 	}
 	else
 	{
 		v = true;
 	}
 
-	pCmd->viewangles += shit;
-	Interfaces::Engine->SetViewAngles(pCmd->viewangles);
+	if (PSilent)
+	{
+		Vector Oldview = pCmd->viewangles;
+		Vector qAimAngles = pCmd->viewangles;
+		float Oldsidemove = pCmd->sidemove;
+		float Oldforwardmove = pCmd->forwardmove;
 
+		static int ChokedPackets = -1;
+
+		if (ShouldFire() && ChokedPackets < 6)
+		{
+			bSendPacket = false;
+			pCmd->viewangles += ang;
+			pCmd->viewangles = angles;
+			ChokedPackets++;
+		}
+		else
+		{
+			bSendPacket = true;
+			pCmd->viewangles = Oldview;
+			pCmd->sidemove = Oldsidemove;
+			pCmd->forwardmove = Oldforwardmove;
+			ChokedPackets = -1;
+		}
+
+		pCmd->viewangles.z = 0;
+	}
+	else
+	{
+		pCmd->viewangles += ang;
+		Interfaces::Engine->SetViewAngles(pCmd->viewangles);
+	}
 	return v;
 }

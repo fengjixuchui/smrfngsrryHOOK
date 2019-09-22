@@ -539,6 +539,10 @@ void XMLUtil::ToStr( bool v, char* buffer, int bufferSize )
     TIXML_SNPRINTF( buffer, bufferSize, "%d", v ? 1 : 0 );
 }
 
+/*
+	ToStr() of a number is a very tricky topic.
+	https://github.com/leethomason/tinyxml2/issues/106
+*/
 void XMLUtil::ToStr( float v, char* buffer, int bufferSize )
 {
     TIXML_SNPRINTF( buffer, bufferSize, "%.8g", v );

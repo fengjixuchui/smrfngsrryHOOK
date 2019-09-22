@@ -1,62 +1,29 @@
 /*
-AyyWare 2 - Extreme Alien Technology
-By Syn
+Syn's AyyWare Framework
 */
 
 #pragma once
 
-#include "Common.h"
+// Includes
+#include "CommonIncludes.h"
 #include "SDK.h"
 
+// Namespace to contain all the valve interfaces
 namespace Interfaces
 {
-	class InterfacesHead;
-	class InterfaceNode;
+	// Gets handles to all the interfaces needed
+	void Initialise();
 
-	class InterfacesHead
-	{
-	public:
-		InterfaceNode* HeadNode; //0x0000 
-	};//Size=0x0040
-
-	class InterfaceNode
-	{
-	public:
-		void* fncGet; //0x0000 
-		char* pName; //0x0004 
-		InterfaceNode* pNext; //0x0008 
-	};//Size=0x001C
-
-	class InterfaceManager
-	{
-	public:
-		InterfaceManager(std::string strModule);
-		InterfaceManager();
-
-		void Setup(std::string strModule);
-		void* GetInterface(std::string strName);
-		void DumpAllInterfaces();
-
-	private:
-		std::string strModuleName;
-		HMODULE ModuleBase;
-		InterfacesHead* pIntHead;
-	};
-
-	//----------------------------------------------------------------------------
-
-	void Initialize();
-
-	// Interface instances here, for example
 	extern IBaseClientDLL* Client;
 	extern IVEngineClient* Engine;
 	extern IPanel* Panels;
 	extern IClientEntityList* EntList;
 	extern ISurface* Surface;
 	extern IVDebugOverlay* DebugOverlay;
-	extern DWORD *ClientMode;
+	extern IClientModeShared* ClientMode;
+
 	extern CGlobalVarsBase *Globals;
-	extern IPrediction *Prediction;
+	extern DWORD *Prediction;
 	extern CMaterialSystem* MaterialSystem;
 	extern CVRenderView* RenderView;
 	extern IVModelRender* ModelRender;
@@ -64,8 +31,6 @@ namespace Interfaces
 	extern IEngineTrace* Trace;
 	extern IPhysicsSurfaceProps* PhysProps;
 	extern ICVar *CVar;
-	extern IMoveHelper *MoveHelper;
-	extern IGameMovement *GameMovement;
-	extern IGameEventManager *GameEventManager;
-
+	extern CInput* pInput;
+	extern IInputSystem* InputSystem;
 };

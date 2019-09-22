@@ -1,106 +1,106 @@
 /*
-AyyWare 2 - Extreme Alien Technology
-By Syn
+Syn's AyyWare Framework 2015
 */
 
 #pragma once
 
-#include "Common.h"
+#include "CommonIncludes.h"
+#include "Utilities.h"
 
+// Various offsets
 namespace Offsets
 {
+	// Sets up all the shit we need
+	void Initialise();
+
+	// Addresses of loaded game modules
+	namespace Modules
+	{
+		extern DWORD Client;
+		extern DWORD Engine;
+		extern DWORD VGUI2;
+		extern DWORD VGUISurface;
+		extern DWORD Material;
+		extern DWORD VPhysics;
+		extern DWORD Stdlib;
+	};
+
+	// Virtual Method Table Indexes
 	namespace VMT
 	{
-		enum  BaseClient
-		{
-			CHL_GetAllClasses = 8,
-			CHL_FrameStageNotify = 37
-		};
+		//CHL Client
+		extern DWORD CHL_GetAllClasses;
 
-		enum EngineClient
-		{
-			Engine_GetScreenSize = 5,
-			Engine_GetPlayerInfo = 8,
-			Engine_GetLocalPlayer = 12,
-			Engine_Time = 14,
-			Engine_GetViewAngles = 18,
-			Engine_SetViewAngles,
-			Engine_GetMaxClients,
-			Engine_IsInGame = 26,
-			Engine_IsConnected,
-			Engine_WorldToScreenMatrix = 37,
-			Engine_GetNetChannelInfo = 78,
-			Engine_ClientCmd_Unrestricted = 114
-		};
+		//Engine Client
+		extern DWORD Engine_GetScreenSize;
+		extern DWORD Engine_GetPlayerInfo;
+		extern DWORD Engine_GetLocalPlayer;
+		extern DWORD Engine_Time;
+		extern DWORD Engine_GetViewAngles;
+		extern DWORD Engine_SetViewAngles;
+		extern DWORD Engine_GetMaxClients;
+		extern DWORD Engine_IsConnected;
+		extern DWORD Engine_IsInGame;
+		extern DWORD Engine_WorldToScreenMatrix;
+		extern DWORD Engine_GetNetChannelInfo;
+		extern DWORD Engine_ClientCmd_Unrestricted;
 
-		enum Surface
-		{
-			Surface_DrawSetColorA = 14,
-			Surface_DrawSetColorB,
-			Surface_DrawFilledRect,
-			Surface_DrawOutlinedRect = 18,
-			Surface_DrawLine,
-			Surface_DrawPolyLine,
-			Surface_DrawSetTextFont = 23,
-			Surface_DrawSetTextColorCol = 24,
-			Surface_DrawSetTextColorRGB,
-			Surface_DrawSetTextPos = 26,
-			Surface_DrawPrintText = 28,
-			Surface_DrawSetTextureRGBA = 37,
-			Surface_DrawSetTexture,
-			Surface_CreateNewTextureID = 43,
-			Surface_SurfaceGetCursorPos = 66,
-			Surface_FontCreate = 71,
-			Surface_SetFontGlyphSet,
-			Surface_GetTextSize = 79,
-			Surface_DrawOutlinedCircle = 103,
-			Surface_DrawTexturedPolygon = 106
-		};
+		// Panels
+		extern DWORD Panel_GetName;
+		extern DWORD Panel_PaintTraverse;
 
-		enum  Panel
-		{
-			Panel_GetName = 36,
-			Panel_PaintTraverse = 41
-		};
+		// Surface
+		extern DWORD Surface_DrawSetColorA;
+		extern DWORD Surface_DrawSetColorB;
+		extern DWORD Surface_DrawFilledRect;
+		extern DWORD Surface_DrawOutlinedRect;
+		extern DWORD Surface_DrawLine;
+		extern DWORD Surface_DrawSetTextFont;
+		extern DWORD Surface_DrawSetTextColorA;
+		extern DWORD Surface_DrawSetTextColorB;
+		extern DWORD Surface_DrawSetTextPos;
+		extern DWORD Surface_DrawPrintText;
+		extern DWORD Surface_DrawSetTextureRGBA;
+		extern DWORD Surface_DrawSetTexture;
+		extern DWORD Surface_CreateNewTextureID;
+		extern DWORD Surface_FontCreate;
+		extern DWORD Surface_SetFontGlyphSet;
+		extern DWORD Surface_GetTextSize;
+		extern DWORD Surface_DrawOutlinedCircle;
+		extern DWORD Surface_SurfaceGetCursorPos;
+		extern DWORD Surface_DrawTexturedPolygon;
 
-		enum Prediction
-		{
-			Predict_InPrediction = 14
-		};
+		extern DWORD Material_GetName;
+		extern DWORD Material_SetMaterialVarFlag;
+		extern DWORD Material_GetMaterialVarFlag;
+		extern DWORD Material_AlphaModulate;
+		extern DWORD Material_ColorModulate;
+		extern DWORD Material_IncrementReferenceCount;
 
-		enum ModelRender
-		{
-			ModelRender_ForcedMaterialOverride = 1,
-			ModelRender_DrawModelExecute = 21
-		};
+		extern DWORD MaterialSystem_FindMaterial;
+		extern DWORD MaterialSystem_CreateMaterial;
 
-		enum IMaterial
-		{
-			Material_GetName = 0,
-			Material_SetMaterialVarFlag = 30,
-			Material_GetMaterialVarFlag = 31,
-			Material_AlphaModulate = 28,
-			Material_ColorModulate = 29,
-			Material_IncrementReferenceCount = 14
-		};
+		extern DWORD ModelRender_ForcedMaterialOverride;
+		extern DWORD ModelRender_DrawModelExecute;
 
-		enum MaterialSystem
-		{
-			MaterialSystem_FindMaterial = 84,
-			MaterialSystem_CreateMaterial = 83
-		};
+		extern DWORD ModelInfo_GetModelName;
+		extern DWORD ModelInfo_GetStudiomodel;
+		
+		extern DWORD RenderView_SetBlend;
+		extern DWORD RenderView_SetColorModulation;
 
-
+		// Weapon entities
+		extern DWORD Weapon_GetSpread;
 	};
 
-	namespace SigScans
+	// Addresses of engine functions to call
+	namespace Functions
 	{
+		extern DWORD KeyValues_KeyValues;
+		extern DWORD KeyValues_LoadFromBuffer;
 		extern DWORD dwCalcPlayerView;
-		extern DWORD dwSpreadVmt;
-		extern DWORD dwGetCSWpnData;
-		extern DWORD dwKeyValues_KeyValues;
-		extern DWORD dwKeyValues_LoadFromBuffer;
+		extern DWORD dwGetPlayerCompRank;
+		extern DWORD dwIsReady;
 	};
 
-	void Init();
 };

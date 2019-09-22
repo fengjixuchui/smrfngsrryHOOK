@@ -1,15 +1,28 @@
 /*
-AyyWare 2 - Extreme Alien Technology
-By Syn
+Syn's AyyWare Framework 2015
 */
 
 #include "Controls.h"
-#include "GUISpecifications.h"
-#include "Render.h"
-#include "Valve/CRC32.h"
-
+#include "RenderManager.h"
 
 #pragma region Base Control
+void CControl::SetPosition(int x, int y)
+{
+	m_x = x;
+	m_y = y;
+}
+
+void CControl::SetSize(int w, int h)
+{
+	m_iWidth = w;
+	m_iHeight = h;
+}
+
+void CControl::GetSize(int &w, int &h)
+{
+	w = m_iWidth;
+	h = m_iHeight;
+}
 
 bool CControl::Flag(int f)
 {
@@ -22,17 +35,20 @@ bool CControl::Flag(int f)
 POINT CControl::GetAbsolutePos()
 {
 	POINT p;
-	
+	RECT client = parent->GetClientArea();
 	if (parent)
 	{
-		RECT client = parent->GetClientArea();
 		p.x = m_x + client.left;
-		p.y = m_y + client.top;
+		p.y = m_y + client.top + 29;
 	}
 
 	return p;
 }
 
+void CControl::SetFileId(std::string fid)
+{
+	FileIdentifier = fid;
+}
 #pragma endregion Implementations of the Base control functions
 
 #pragma region CheckBox
@@ -60,32 +76,28 @@ bool CCheckBox::GetState()
 void CCheckBox::Draw(bool hover)
 {
 	POINT a = GetAbsolutePos();
-
-	Color outline = UI_COL_TABTEXT;
+	Render::Outline(a.x, a.y, 13, 13, Color(255, 255, 255, 255));
 
 	if (hover)
 	{
 		if (Checked)
 		{
-			outline = UI_COL_MAINDARK;
+			Render::Clear(a.x + 2, a.y + 2, 9, 9, Color(120, 0, 0, 255));
 		}
 		else
 		{
-			outline = UI_COL_SHADOW;
+			Render::Clear(a.x + 2, a.y + 2, 9, 9, Color(129, 129, 129, 255));
 		}
+		Render::Outline(a.x + 2, a.y + 2, 9, 9, Color(20, 20, 20, 80));
 	}
 	else if (Checked)
 	{
-		outline = UI_COL_MAIN;
+		Render::Clear(a.x + 2, a.y + 2, 9, 9, Color(160, 0, 0, 255));
+		Render::Outline(a.x + 2, a.y + 2, 9, 9, Color(20, 20, 20, 80));
 	}
-
-	if(Checked)
-		Render::Text(a.x + 1, a.y, UI_COL_MAIN, Render::Fonts::MenuSymbols, L"\uE10B");
-
-	Render::Outline(a.x, a.y, UI_CHK_SIZE, UI_CHK_SIZE, outline);
 }
 
-void CCheckBox::OnUpdate() { m_iWidth = UI_CHK_SIZE; 	m_iHeight = UI_CHK_SIZE; }
+void CCheckBox::OnUpdate() { m_iWidth = 13; 	m_iHeight = 13; }
 
 void CCheckBox::OnClick()
 {
@@ -97,14 +109,19 @@ void CCheckBox::OnClick()
 CLabel::CLabel()
 {
 	m_Flags = UIFlags::UI_Drawable;
-	FontColor = UI_COL_TABTEXT;
-	Text = "";
+	Text = "Default";
+	FileIdentifier = "Default";
 }
 
 void CLabel::Draw(bool hover)
 {
 	POINT a = GetAbsolutePos();
-	Render::Text(a.x, a.y, FontColor, Render::Fonts::MenuText, Text.c_str());
+	Render::Text(a.x, a.y, Color(245, 245, 245, 255), Render::Fonts::MenuBold, Text.c_str());
+}
+
+void CLabel::SetText(std::string text)
+{
+	Text = text;
 }
 
 void CLabel::OnUpdate() {}
@@ -114,22 +131,24 @@ void CLabel::OnClick() {}
 #pragma region GroupBox
 CGroupBox::CGroupBox()
 {
-	MaxRow = 1;
+	Items = 1;
 	m_Flags = UIFlags::UI_Drawable | UIFlags::UI_RenderFirst;
 	Text = "Default";
+	FileIdentifier = "Default";
 }
 
 void CGroupBox::Draw(bool hover)
 {
 	POINT a = GetAbsolutePos();
-	
-	Render::Clear(a.x, a.y, m_iWidth, m_iHeight, COL_WHITE);
-	Render::Outline(a.x, a.y, m_iWidth, m_iHeight, UI_COL_GROUPOUTLINE);
+	RECT txtSize = Render::GetTextSize(Render::Fonts::MenuBold, Text.c_str());
+	Render::Clear(a.x + 2, a.y + 2, m_iWidth - 4, m_iHeight - 4, Color(8, 8, 8, 10)); // menu mini box color
+	Render::Text(a.x + 15, a.y - (txtSize.bottom / 2), Color(255, 255, 255, 255), Render::Fonts::MenuBold, Text.c_str());
 
-	Render::Clear(a.x + 8, a.y + 20, m_iWidth - 16, 1, UI_COL_GROUPOUTLINE);
-
-	RECT txtSize = Render::GetTextSize(Render::Fonts::MenuText, Text.c_str());
-	Render::Text(a.x + (m_iWidth / 2) - (txtSize.right / 2), a.y + 4, UI_COL_TABTEXT, Render::Fonts::MenuText, Text.c_str());
+	Render::Line(a.x, a.y, a.x + 12, a.y, Color(129, 129, 129, 255));
+	Render::Line(a.x + 15 + txtSize.right + 5, a.y, a.x + m_iWidth, a.y, Color(129, 129, 129, 255));
+	Render::Line(a.x, a.y, a.x, a.y + m_iHeight, Color(129, 129, 129, 255));
+	Render::Line(a.x, a.y + m_iHeight, a.x + m_iWidth, a.y + m_iHeight, Color(129, 129, 129, 255));
+	Render::Line(a.x + m_iWidth, a.y, a.x + m_iWidth, a.y + m_iHeight, Color(129, 129, 129, 255));
 }
 
 void CGroupBox::SetText(std::string text)
@@ -137,36 +156,27 @@ void CGroupBox::SetText(std::string text)
 	Text = text;
 }
 
-void CGroupBox::PlaceLabledControl(std::string Label, CTab *Tab, CControl* control, int c, int r)
+void CGroupBox::PlaceLabledControl(std::string Label, CTab *Tab, CControl* control)
 {
-	int CellW = (m_iWidth / Columns);
-	int x = m_x + 10 + (c * CellW);
-	int y = m_y + 26 + r * 22;
+	int x = m_x + 16;
+	int y = m_y + Items * 24;
 
 	CLabel* label = new CLabel;
 	label->SetPosition(x, y);
 	label->SetText(Label);
 	Tab->RegisterControl(label);
 
-	x += CellW / 2;
+	x += m_iWidth / 2;
 
 	int cw, ch;
 	control->SetPosition(x, y);
 	control->GetSize(cw, ch);
-	control->SetSize((CellW / 2) - 20, ch);
+	control->SetSize((m_iWidth / 2) - 32, ch);
 	Tab->RegisterControl(control);
-
-	if (r > MaxRow)
-		MaxRow = r;
-
-	char szCRCBuffer[256];
-	sprintf_s(szCRCBuffer, "%s%s", Text.c_str(), Label.c_str());
-	control->SetFileID(CRC32(szCRCBuffer, strlen(szCRCBuffer)));
-	
-	m_iHeight = (MaxRow + 1) * 22 + 26;
+	Items++;
 }
 
-void CGroupBox::OnUpdate() { m_iWidth = parent->GetClientArea().right - 20; }
+void CGroupBox::OnUpdate() {}
 void CGroupBox::OnClick() {}
 #pragma endregion Implementations of the Group Box functions
 
@@ -174,6 +184,7 @@ void CGroupBox::OnClick() {}
 CSlider::CSlider()
 {
 	m_Flags = UIFlags::UI_Drawable | UIFlags::UI_Clickable | UIFlags::UI_SaveFile;
+
 	FileControlType = UIControlTypes::UIC_Slider;
 }
 
@@ -181,20 +192,18 @@ void CSlider::Draw(bool hover)
 {
 	POINT a = GetAbsolutePos();
 
-	Render::Clear(a.x, a.y + 5, m_iWidth, 5, Color(110, 183, 212, 255));
-	Render::Outline(a.x-1, a.y + 4, m_iWidth+2, 7, UI_COL_SHADOW);
-	Render::GradientV(a.x, a.y + 5, m_iWidth, 3, Color(28, 136, 0, 255), Color(28, 136, 0, 255));
+	Render::Clear(a.x, a.y + 5, m_iWidth, 2, Color(161, 161, 161, 255));
 
 	float Ratio = Value / (Max - Min);
 	float Location = Ratio*m_iWidth;
 
-	Render::Clear(a.x, a.y + 5, Location, 5, UI_COL_MAIN);
-	Render::Clear(a.x, a.y + 9, Location, 1, Color(50, 50, 50, 50));
+	Render::Clear(a.x + Location, a.y + 1, 4, 9, Color(255, 0, 0, 255));
+	Render::Outline(a.x + Location, a.y + 1, 4, 9, Color(20, 20, 20, 80));
 
 	char buffer[24];
 	sprintf_s(buffer, "%.2f", Value);
-	RECT txtSize = Render::GetTextSize(Render::Fonts::MenuText, buffer);
-	Render::Text(a.x + (m_iWidth / 2) - txtSize.right / 2, a.y + 10, UI_COL_TABTEXT, Render::Fonts::MenuText, buffer);
+	RECT txtSize = Render::GetTextSize(Render::Fonts::MenuBold, buffer);
+	Render::Text(a.x + (m_iWidth / 2) - txtSize.right / 2, a.y + 10, Color(255, 255, 255, 255), Render::Fonts::MenuBold, buffer);
 }
 
 void CSlider::OnUpdate() {
@@ -221,8 +230,7 @@ void CSlider::OnUpdate() {
 	}
 }
 
-void CSlider::OnClick()
-{
+void CSlider::OnClick() {
 	POINT a = GetAbsolutePos();
 	RECT SliderRegion = { a.x, a.y, m_iWidth, 11 };
 	if (GUI.IsMouseInRegion(SliderRegion))
@@ -247,138 +255,6 @@ void CSlider::SetBoundaries(float min, float max)
 }
 #pragma endregion Implementations of the Slider functions
 
-#pragma region ComboBox
-CComboBox::CComboBox()
-{
-	m_Flags = UIFlags::UI_Drawable | UIFlags::UI_Clickable | UIFlags::UI_Focusable | UIFlags::UI_SaveFile;
-	FileControlType = UIControlTypes::UIC_ComboBox;
-}
-
-void CComboBox::Draw(bool hover)
-{
-	POINT a = GetAbsolutePos();
-	RECT Region = { a.x, a.y, m_iWidth, 16 };
-	Render::Outline(a.x, a.y, m_iWidth, 16, UI_COL_CLIENTBACK);
-
-	bool topHover = false;
-	// Hover for the Top Box
-	if (GUI.IsMouseInRegion(Region))
-	{
-		Render::Clear(a.x + 2, a.y + 2, m_iWidth - 4, 12, UI_COL_CLIENTBACK);
-		topHover = true;
-	}
-
-
-	// If we have some items
-	if (Items.size() > 0)
-	{
-		// The current item
-		Render::Text(a.x + 4, a.y + 1, UI_COL_TABTEXT, Render::Fonts::MenuText, GetItem().c_str());
-
-		// If the drop down part is open
-		if (IsOpen)
-		{
-			Render::Clear(a.x, a.y + 17, m_iWidth, Items.size() * 16, UI_COL_CLIENTBACK);
-
-			// Draw the items
-			for (int i = 0; i < Items.size(); i++)
-			{
-				RECT ItemRegion = { a.x, a.y + 17 + i * 16, m_iWidth, 16 };
-
-				// Hover
-				if (GUI.IsMouseInRegion(ItemRegion))
-				{
-					Render::Clear(a.x, a.y + 17 + i * 16, m_iWidth, 16, UI_COL_GROUPOUTLINE);
-				}
-
-				Render::Text(a.x + 4, a.y + 19 + i * 16, UI_COL_TABTEXT, Render::Fonts::MenuText, Items[i].c_str());
-			}
-		}
-	}
-}
-
-void CComboBox::AddItem(std::string text)
-{
-	Items.push_back(text);
-	SelectedIndex = 0;
-}
-
-void CComboBox::OnUpdate()
-{
-	if (IsOpen)
-	{
-		m_iHeight = 16 + 16 * Items.size();
-
-		if (parent->GetFocus() != this)
-			IsOpen = false;
-	}
-	else
-	{
-		m_iHeight = 16;
-	}
-
-}
-
-void CComboBox::OnClick()
-{
-	POINT a = GetAbsolutePos();
-	RECT Region = { a.x, a.y, m_iWidth, 16 };
-
-	if (IsOpen)
-	{
-		// If we clicked one of the items(Not in the top bar)
-		if (!GUI.IsMouseInRegion(Region))
-		{
-			// Draw the items
-			for (int i = 0; i < Items.size(); i++)
-			{
-				RECT ItemRegion = { a.x, a.y + 16 + i * 16, m_iWidth, 16 };
-
-				// Hover
-				if (GUI.IsMouseInRegion(ItemRegion))
-				{
-					SelectedIndex = i;
-
-					if (OnItemSelect != nullptr)
-						OnItemSelect();
-				}
-			}
-		}
-
-		// Close the drop down
-		IsOpen = false;
-	}
-	else
-	{
-		IsOpen = true;
-	}
-}
-
-int CComboBox::GetIndex()
-{
-	return SelectedIndex;
-}
-
-std::string CComboBox::GetItem()
-{
-	if (SelectedIndex >= 0 && SelectedIndex < Items.size())
-	{
-		return Items[SelectedIndex];
-	}
-
-	return "Error";
-}
-
-void CComboBox::SelectIndex(int idx)
-{
-	if (idx >= 0 && idx < Items.size())
-	{
-		SelectedIndex = idx;
-	}
-}
-
-#pragma endregion Implementations of the ComboBox functions
-
 #pragma region KeyBinders
 
 char* KeyStrings[254] = { nullptr, "Left Mouse", "Right Mouse", "Control+Break", "Middle Mouse", "Mouse 4", "Mouse 5",
@@ -402,7 +278,6 @@ nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
 CKeyBind::CKeyBind()
 {
 	m_Flags = UIFlags::UI_Drawable | UIFlags::UI_Clickable | UIFlags::UI_SaveFile;
-	Key = -1;
 	FileControlType = UIControlTypes::UIC_KeyBind;
 }
 
@@ -410,9 +285,9 @@ void CKeyBind::Draw(bool hover)
 {
 	POINT a = GetAbsolutePos();
 
-	Render::Outline(a.x, a.y, m_iWidth, m_iHeight, UI_COL_CLIENTBACK);
+	Render::Outline(a.x, a.y, m_iWidth, m_iHeight, Color(129, 129, 129, 255));
 	if (hover)
-		Render::Clear(a.x + 2, a.y + 2, m_iWidth - 4, m_iHeight - 4, UI_COL_CLIENTBACK);
+		Render::Clear(a.x + 2, a.y + 2, m_iWidth - 4, m_iHeight - 4, Color(255, 255, 255, 80));
 	bool GoodKeyName = false;
 	char NameBuffer[128];
 	char* KeyName = "Not Bound";
@@ -447,7 +322,7 @@ void CKeyBind::Draw(bool hover)
 	}
 
 
-	Render::Text(a.x + 4, a.y + 1, UI_COL_TABTEXT, Render::Fonts::MenuText, KeyName);
+	Render::Text(a.x + 2, a.y + 2, Color(255, 255, 255, 255), Render::Fonts::MenuBold, KeyName);
 }
 
 void CKeyBind::OnUpdate() {
@@ -494,126 +369,159 @@ void CKeyBind::SetKey(int key)
 
 #pragma endregion Implementations of the KeyBind Control functions
 
-#define LIST_ITEM_HEIGHT 16
-#define LIST_SCROLL_WIDTH 16
-
-#pragma region ListBox
-CListBox::CListBox()
+#pragma region Button
+CButton::CButton()
 {
+	m_iWidth = 177;
 	m_Flags = UIFlags::UI_Drawable | UIFlags::UI_Clickable;
+	Text = "Default";
+	CallBack = nullptr;
+	FileIdentifier = "Default";
+}
+
+void CButton::Draw(bool hover)
+{
+	POINT a = GetAbsolutePos();
+	Render::Outline(a.x, a.y, m_iWidth, m_iHeight, Color(129, 129, 129, 255));
+	if (hover)
+		Render::GradientV(a.x + 2, a.y + 2, m_iWidth - 4, m_iHeight - 4, Color(60, 60, 60, 255), Color(80, 80, 80, 255));
+	else
+		Render::GradientV(a.x + 2, a.y + 2, m_iWidth - 4, m_iHeight - 4, Color(8, 8, 8, 255), Color(8, 8, 8, 255));
+
+	RECT TextSize = Render::GetTextSize(Render::Fonts::MenuBold, Text.c_str());
+	int TextX = a.x + (m_iWidth / 2) - (TextSize.left / 2);
+	int TextY = a.y + (m_iHeight / 2) - (TextSize.bottom / 2);
+
+	Render::Text(TextX, TextY, Color(255, 255, 255, 255), Render::Fonts::MenuBold, Text.c_str());
+}
+
+void CButton::SetText(std::string text)
+{
+	Text = text;
+}
+
+void CButton::SetCallback(CButton::ButtonCallback_t callback)
+{
+	CallBack = callback;
+}
+
+void CButton::OnUpdate()
+{
+	m_iHeight = 26;
+}
+
+void CButton::OnClick()
+{
+	if (CallBack)
+		CallBack();
+}
+#pragma endregion Implementations of the Button functions
+
+#pragma region ComboBox
+CComboBox::CComboBox()
+{
+	m_Flags = UIFlags::UI_Drawable | UIFlags::UI_Clickable | UIFlags::UI_Focusable | UIFlags::UI_SaveFile;
+	FileControlType = UIControlTypes::UIC_ComboBox;
+}
+
+void CComboBox::Draw(bool hover)
+{
+	POINT a = GetAbsolutePos();
+	RECT Region = { a.x, a.y, m_iWidth, 16 };
+	Render::Outline(a.x, a.y, m_iWidth, 16, Color(129, 129, 129, 255));
+
+	// Hover for the Top Box
+	if (GUI.IsMouseInRegion(Region))
+		Render::Clear(a.x + 2, a.y + 2, m_iWidth - 4, 12, Color(80, 80, 80, 255));
+
+	// If we have some items
+	if (Items.size() > 0)
+	{
+		// The current item
+		Render::Text(a.x + 2, a.y + 2, Color(255, 255, 255, 255), Render::Fonts::MenuBold, GetItem().c_str());
+
+		// If the drop down part is open
+		if (IsOpen)
+		{
+			Render::Clear(a.x, a.y + 17, m_iWidth, Items.size() * 16, Color(80, 80, 80, 255));
+
+			// Draw the items
+			for (int i = 0; i < Items.size(); i++)
+			{
+				RECT ItemRegion = { a.x, a.y + 17 + i * 16, m_iWidth, 16 };
+
+				// Hover
+				if (GUI.IsMouseInRegion(ItemRegion))
+				{
+					Render::Clear(a.x, a.y + 17 + i * 16, m_iWidth, 16, Color(207, 207, 207, 255));
+				}
+
+				Render::Text(a.x + 2, a.y + 19 + i * 16, Color(255, 255, 255, 255), Render::Fonts::MenuBold, Items[i].c_str());
+			}
+		}
+	}
+}
+
+void CComboBox::AddItem(std::string text)
+{
+	Items.push_back(text);
 	SelectedIndex = 0;
 }
 
-void CListBox::Draw(bool hover)
+void CComboBox::OnUpdate()
 {
-	int ItemsToDraw = m_iHeight / LIST_ITEM_HEIGHT;
-	POINT a = GetAbsolutePos();
-
-	Render::Outline(a.x, a.y, m_iWidth, m_iHeight+2, UI_COL_CLIENTBACK);
-
-	if (Items.size() > 0)
+	if (IsOpen)
 	{
-		int drawnItems = 0;
-		for (int i = ScrollTop; (i < Items.size() && drawnItems < ItemsToDraw); i++)
+		m_iHeight = 16 + 16 * Items.size();
+
+		if (parent->GetFocus() != this)
+			IsOpen = false;
+	}
+	else
+	{
+		m_iHeight = 16;
+	}
+
+}
+
+void CComboBox::OnClick()
+{
+	POINT a = GetAbsolutePos();
+	RECT Region = { a.x, a.y, m_iWidth, 16 };
+
+	if (IsOpen)
+	{
+		// If we clicked one of the items(Not in the top bar)
+		if (!GUI.IsMouseInRegion(Region))
 		{
-			Color textColor = UI_COL_TABTEXT;
-			RECT ItemRegion = { a.x+1, a.y + 1+ drawnItems * 16, m_iWidth - LIST_SCROLL_WIDTH - 2 , 16 };
-
-			if (i == SelectedIndex)
+			// Draw the items
+			for (int i = 0; i < Items.size(); i++)
 			{
-				textColor = COL_WHITE;
-				Render::Clear(ItemRegion.left, ItemRegion.top, ItemRegion.right, ItemRegion.bottom, UI_COL_MAIN);
-			}
-			else if (GUI.IsMouseInRegion(ItemRegion))
-			{
-				textColor = COL_WHITE;
-				Render::Clear(ItemRegion.left, ItemRegion.top, ItemRegion.right, ItemRegion.bottom, UI_COL_TABTEXT);
-			}
+				RECT ItemRegion = { a.x, a.y + 16 + i * 16, m_iWidth, 16 };
 
-			Render::Text(ItemRegion.left+4, ItemRegion.top+2, textColor, Render::Fonts::MenuText, Items[i].c_str());
-			drawnItems++;
+				// Hover
+				if (GUI.IsMouseInRegion(ItemRegion))
+				{
+					SelectedIndex = i;
+				}
+			}
 		}
 
-		// Ratio of how many visible to how many are hidden
-		float sizeRatio = float(ItemsToDraw) / float(Items.size());
-		if (sizeRatio > 1.f) sizeRatio = 1.f;
-		float posRatio = float(ScrollTop) / float(Items.size());
-		if (posRatio > 1.f) posRatio = 1.f;
-
-		sizeRatio *= m_iHeight;
-		posRatio *= m_iHeight;
-
-		Render::Clear(a.x + m_iWidth - LIST_SCROLL_WIDTH, a.y + posRatio, LIST_SCROLL_WIDTH, sizeRatio, UI_COL_TABTEXT);
+		// Close the drop down
+		IsOpen = false;
 	}
-
-}
-
-void CListBox::AddItem(std::string text, int value)
-{
-	Items.push_back(text);
-	Values.push_back(value);
-}
-
-void CListBox::OnClick()
-{
-	int ItemsToDraw = m_iHeight / LIST_ITEM_HEIGHT;
-	POINT a = GetAbsolutePos();
-
-	// Check the items
-	if (Items.size() > 0)
+	else
 	{
-		int drawnItems = 0;
-		for (int i = ScrollTop; (i < Items.size() && drawnItems < ItemsToDraw); i++)
-		{
-			Color textColor = UI_COL_TABTEXT;
-			RECT ItemRegion = { a.x + 1, a.y + 1 + drawnItems * 16, m_iWidth - LIST_SCROLL_WIDTH - 2 , 16 };
-			if (GUI.IsMouseInRegion(ItemRegion))
-			{
-				SelectItem(i);
-				return;
-			}
-			drawnItems++;
-		}
-	}
-
-	// Scrollbar checks are in update so we can just drag
-
-}
-
-void CListBox::OnUpdate()
-{
-	int ItemsToDraw = m_iHeight / LIST_ITEM_HEIGHT;
-	POINT a = GetAbsolutePos();
-
-	// Did we click in the scrollbar??
-	RECT Scroll = { a.x + m_iWidth - LIST_SCROLL_WIDTH , a.y + 1, LIST_SCROLL_WIDTH - 2 ,m_iHeight };
-	if (GUI.IsMouseInRegion(Scroll) && GUI.GetKeyState(VK_LBUTTON))
-	{
-		// Ratio of how many visible to how many are hidden
-		float ratio = float(ItemsToDraw) / float(Items.size());
-		POINT m = GUI.GetMouse();
-		m.y -= a.y;
-		
-		float sizeRatio = float(ItemsToDraw) / float(Items.size());
-		sizeRatio *= m_iHeight;
-		float heightDelta = m.y + sizeRatio - m_iHeight;
-		if (heightDelta > 0)
-			m.y -= heightDelta;
-
-		float mPosRatio = float(m.y) / float(m_iHeight);
-		ScrollTop = mPosRatio*Items.size();
-		if (ScrollTop < 0)
-			ScrollTop = 0;
-
+		IsOpen = true;
 	}
 }
 
-void CListBox::SetHeightInItems(int items)
+int CComboBox::GetIndex()
 {
-	m_iHeight = items*LIST_ITEM_HEIGHT;
+	return SelectedIndex;
 }
 
-std::string CListBox::GetItem()
+std::string CComboBox::GetItem()
 {
 	if (SelectedIndex >= 0 && SelectedIndex < Items.size())
 	{
@@ -623,5 +531,12 @@ std::string CListBox::GetItem()
 	return "Error";
 }
 
+void CComboBox::SelectIndex(int idx)
+{
+	if (idx >= 0 && idx < Items.size())
+	{
+		SelectedIndex = idx;
+	}
+}
 
-#pragma endregion Implementations of the ListBox functions
+#pragma endregion Implementations of the ComboBox functions

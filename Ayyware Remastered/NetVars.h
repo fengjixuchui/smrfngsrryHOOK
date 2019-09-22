@@ -1,51 +1,86 @@
-//
-// Syn's "Storm" Cheat
-// Started October 2015
-//
 
-// Source engine interface management
-
-
+// Credits to Valve and Shad0w
 
 #pragma once
 
 //uncomment me if you wish to dump netvars
-#define DUMP_NETVARS_TO_FILE 
+//#define DUMP_NETVARS_TO_FILE 
 
-#include "Common.h"
+#include "CommonIncludes.h"
+#include <memory>
+
+class NetvarDatabase;
+struct NetvarTable;
+
+struct netvar_info_s
+{
+#ifdef DUMP_NETVARS_TO_FILE
+	char szTableName[128];
+	char szPropName[128];
+#endif
+	DWORD_PTR dwCRC32;
+	DWORD_PTR dwOffset;
+};
 
 struct RecvTable;
 
-class CNetVars
+class CNetVar
 {
 public:
-	void Initialize();
-	DWORD GetOffset(DWORD dwCRC32); // Gets a netvar offset given it's crc
+	void RetrieveClasses();
+	void LogNetVar(RecvTable *table, int align);
+	DWORD_PTR GetNetVar(DWORD_PTR dwCRC32);
+	void HookProxies();
 private:
-	void AddRecursive(RecvTable *pTable, int level);
-	std::map<DWORD, DWORD> NetvarHashes;
+	std::vector<netvar_info_s>vars;
 };
 
-extern CNetVars NetVars;
+class NetvarManager
+{
+private:
+	static NetvarManager* instance;
 
-// This stuff keeps things tidy :)
+	NetvarManager();
+	~NetvarManager();
 
-#define dwThis (DWORD)this
-#define NETVAR(type,offset) *(type*)(dwThis + offset)
-#define CNETVAR(type,offset) (type)(dwThis + offset)
+	NetvarManager(const NetvarManager&) = delete;
 
-//CNETVAR_FUNC - creates a netvar function in a class that returns value(s) [type=class type & return type] [name=function name] [netvar_crc=crc32 of netvar of choice]
-#define CNETVAR_FUNC(type,name,netvar_crc) \
-	type name() \
-	{ \
-		static DWORD dwObserverTarget=NetVars.GetOffset(netvar_crc); \
-		return NETVAR(type,dwObserverTarget); \
+public:
+	static NetvarManager* Instance()
+	{
+		if (!instance) instance = new NetvarManager;
+		return instance;
 	}
 
-//CPNETVAR_FUNC - creates a netvar function in a class that returns a pointer [type=class type & return type] [name=function name] [netvar_crc=crc32 of netvar of choice]
-#define CPNETVAR_FUNC(type,name,netvar_crc) \
-	type name() \
-	{ \
-		static DWORD dwObserverTarget=NetVars.GetOffset(netvar_crc); \
-		return CNETVAR(type,dwObserverTarget); \
+	void CreateDatabase();
+	void DestroyDatabase();
+
+	void Dump(std::ostream& stream);
+	void Dump(const std::string& file);
+
+	int GetNetvarCount() { return m_netvarCount; }
+	int GetTableCount() { return m_tableCount; }
+
+	template<typename ...Args>
+	uint32_t GetOffset(const std::string& szTableName, Args&&... args)
+	{
+		return GetOffset(szTableName, { std::forward<Args>(args)... });
 	}
+private:
+	std::unique_ptr<NetvarTable>  InternalLoadTable(RecvTable* pRecvTable, uint32_t offset);
+	void                          Dump(std::ostream& output, NetvarTable& table, int level);
+	uint32_t                      GetOffset(const std::string& szTableName, const std::initializer_list<std::string>& props);
+
+private:
+	std::unique_ptr<NetvarDatabase>    m_pDatabase = nullptr;
+	uint32_t                           m_tableCount = 0;
+	uint32_t                           m_netvarCount = 0;
+};
+
+#ifdef DUMP_NETVARS_TO_FILE
+#define NETVAR_FILENAME "netvars.txt"
+#endif
+
+extern CNetVar NetVar;
+
+#define GET_NETVAR(table, ...) NetvarManager::Instance()->GetOffset(table, __VA_ARGS__)

@@ -1,44 +1,44 @@
 /*
-AyyWare 2 - Extreme Alien Technology
-By Syn
+Syn's AyyWare Framework 2015
 */
 
 #pragma once
 
+#pragma once
+
+#include "CommonIncludes.h"
 #include "SDK.h"
-#include <list>
+#include "Menu.h"
+#include <vector>
 
 namespace Hacks
 {
-	void Initialize();
+	void SetupHacks();
 	void DrawHacks();
-	void MoveHacks(CUserCmd* pCmd);
-};
+	void MoveHacks(CUserCmd *pCmd, bool &bSendPacket);
+}
 
-// Hack features implement this shit
-class Hack
+class CHack
 {
 public:
-	virtual void Setup() = 0;
 	virtual void Draw() = 0;
-	virtual void Move(CUserCmd* pCmd) = 0;
+	virtual void Move(CUserCmd *pCmd, bool &bSendPacket) = 0;
+	virtual void Init() = 0;
 };
 
-
-// Keeps track of implemented hack classes
-class CHackManager
+class HackManager
 {
 public:
-	void Setup();
-	void Draw();
-	void Move(CUserCmd* pCmd);
+	void RegisterHack(CHack* hake);
+	void Ready();
 
-	void AddHack(Hack* pHack);
-	inline IClientEntity* pLocal() { return pLocalInstance; };
+	void Draw();
+	void Move(CUserCmd *pCmd,bool &bSendPacket);
+	IClientEntity *pLocal();
 private:
-	std::list<Hack*> HackList;
-	IClientEntity* pLocalInstance;
+	std::vector<CHack*> Hacks;
+	IClientEntity *pLocalInstance;
+	bool IsReady;
 };
 
-// Instance of this shit
-extern CHackManager HackManager;
+extern HackManager hackManager;

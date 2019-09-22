@@ -1,10 +1,8 @@
 /*
-AyyWare 2 - Extreme Alien Technology
-By Syn
+Syn's AyyWare Framework 2015
 */
 
 #pragma once
-
 #include "SDK.h"
 
 void InitKeyValues(KeyValues* keyValues, char* name);

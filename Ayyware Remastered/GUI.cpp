@@ -1,17 +1,17 @@
 /*
-AyyWare 2 - Extreme Alien Technology
-By Syn
+Syn's AyyWare Framework 2015
 */
 
 #include "GUI.h"
-#include "Render.h"
-#include "GUISpecifications.h"
-#include <fstream>
+
+#include "RenderManager.h"
+#include "MetaInfo.h"
 
 #include <algorithm>
 #include "tinyxml2.h"
 #include "Controls.h"
-#include "DLLMain.h"
+
+bool m_bIsOpen;
 
 CGUI GUI;
 
@@ -20,16 +20,14 @@ CGUI::CGUI()
 
 }
 
-//
 // Draws all windows 
-//
 void CGUI::Draw()
 {
 	bool ShouldDrawCursor = false;
 
 	for (auto window : Windows)
 	{
-		if (window->m_bIsOpen)
+		if (m_bIsOpen)
 		{
 			ShouldDrawCursor = true;
 			DrawWindow(window);
@@ -42,10 +40,10 @@ void CGUI::Draw()
 		static Vertex_t MouseVt[3];
 
 		MouseVt[0].Init(Vector2D(Mouse.x, Mouse.y));
-		MouseVt[1].Init(Vector2D(Mouse.x + UI_CURSORSIZE, Mouse.y));
-		MouseVt[2].Init(Vector2D(Mouse.x, Mouse.y + UI_CURSORSIZE));
+		MouseVt[1].Init(Vector2D(Mouse.x + 16, Mouse.y));
+		MouseVt[2].Init(Vector2D(Mouse.x, Mouse.y + 16));
 
-		Render::PolygonOutline(3, MouseVt, UI_CURSORFILL, UI_CURSOROUTLINE);
+		Render::PolygonOutline(3, MouseVt, Color(0, 0, 0, 0), Color(0, 0, 0, 0));
 	}
 }
 
@@ -54,22 +52,22 @@ void CGUI::Update()
 {
 	//Key Array
 	std::copy(keys, keys + 255, oldKeys);
-	for (int x = 0; x < 255; x++) {
-		keys[x] = static_cast<bool>(GetAsyncKeyState(x));
+	for (int x = 0; x < 255; x++)
+	{
+		//oldKeys[x] = oldKeys[x] & keys[x];
+		keys[x] = (GetAsyncKeyState(x));
 	}
 
 	// Mouse Location
 	POINT mp; GetCursorPos(&mp);
-	ScreenToClient(GetForegroundWindow(), &mp);
 	Mouse.x = mp.x; Mouse.y = mp.y;
-	//Interfaces::Surface->SurfaceGetCursorPos(Mouse.x, Mouse.y);
 
 	RECT Screen = Render::GetViewport();
 
 	// Window Binds
-	for (auto bind : WindowBinds)
+	for (auto& bind : WindowBinds)
 	{
-		if (GetKeyPress(bind.first) && bind.second != nullptr)
+		if (GetKeyPress(bind.first))
 		{
 			bind.second->Toggle();
 		}
@@ -95,7 +93,7 @@ void CGUI::Update()
 	// Process some windows
 	for (auto window : Windows)
 	{
-		if (window->m_bIsOpen)
+		if (m_bIsOpen)
 		{
 			// Used to tell the widget processing that there could be a click
 			bool bCheckWidgetClicks = false;
@@ -105,26 +103,22 @@ void CGUI::Update()
 			{
 				if (IsMouseInRegion(window->m_x, window->m_y, window->m_x + window->m_iWidth, window->m_y + window->m_iHeight))
 				{
-					// Close Button
-					if (IsMouseInRegion(window->m_x + window->m_iWidth - UI_WIN_CLOSE_X, window->m_y, window->m_x + window->m_iWidth, window->m_y+UI_WIN_CLOSE_X))
+					// Is it inside the client area?
+					if (IsMouseInRegion(window->GetClientArea()))
 					{
-						window->Toggle();
-					}
-					else
-					// User is selecting a new tab
-					if (IsMouseInRegion(window->GetTabArea()))
-					{
-						
-						bCheckWidgetClicks = true;
-
-						int iTab = 0;
-						int TabCount = window->Tabs.size();
-						if (TabCount) // If there are some tabs
+						// User is selecting a new tab
+						if (IsMouseInRegion(window->GetTabArea()))
 						{
-							int TabSize = UI_TAB_HEIGHT;
-							int Dist = Mouse.y - (window->m_y + UI_WIN_TITLEHEIGHT + UI_WIN_TOPHEIGHT);
-							if (Dist < (UI_TAB_HEIGHT*TabCount))
+							// Loose focus on the control
+							window->IsFocusingControl = false;
+							window->FocusedControl = nullptr;
+
+							int iTab = 0;
+							int TabCount = window->Tabs.size();
+							if (TabCount) // If there are some tabs
 							{
+								int TabSize = (window->m_iWidth - 4 - 12) / TabCount;
+								int Dist = Mouse.x - (window->m_x + 8);
 								while (Dist > TabSize)
 								{
 									if (Dist > TabSize)
@@ -132,24 +126,12 @@ void CGUI::Update()
 										iTab++;
 										Dist -= TabSize;
 									}
-									if (iTab == (TabCount - 1))
-									{
-										break;
-									}
 								}
 								window->SelectedTab = window->Tabs[iTab];
-
-								// Loose focus on the control
-								bCheckWidgetClicks = false;
-								window->IsFocusingControl = false;
-								window->FocusedControl = nullptr;
 							}
-						}
 
-					}
-					// Is it inside the client area?
-					else if (IsMouseInRegion(window->GetClientArea()))
-					{
+						}
+						else
 							bCheckWidgetClicks = true;
 					}
 					else
@@ -173,6 +155,7 @@ void CGUI::Update()
 					window->FocusedControl = nullptr;
 				}
 			}
+
 
 			// Controls 
 			if (window->SelectedTab != nullptr)
@@ -214,8 +197,6 @@ void CGUI::Update()
 						if (SkipWidget && SkipMe == control)
 							continue;
 
-						control->parent = window;
-
 						POINT cAbs = control->GetAbsolutePos();
 						RECT controlRect = { cAbs.x, cAbs.y, control->m_iWidth, control->m_iHeight };
 						control->OnUpdate();
@@ -253,9 +234,7 @@ void CGUI::Update()
 	}
 }
 
-//
-// Returns true if this key has just been pressed
-//
+// Returns 
 bool CGUI::GetKeyPress(unsigned int key)
 {
 	if (keys[key] == true && oldKeys[key] == false)
@@ -264,20 +243,11 @@ bool CGUI::GetKeyPress(unsigned int key)
 		return false;
 }
 
-//
-// Returns true if this key is being held down
-//
 bool CGUI::GetKeyState(unsigned int key)
 {
-	if (key >= 0 && key <= 255)
-		return keys[key];
-	else
-		return false;
+	return keys[key];
 }
 
-//
-// Returns true if this key is inside the given region
-//
 bool CGUI::IsMouseInRegion(int x, int y, int x2, int y2)
 {
 	if (Mouse.x > x && Mouse.y > y && Mouse.x < x2 && Mouse.y < y2)
@@ -286,74 +256,57 @@ bool CGUI::IsMouseInRegion(int x, int y, int x2, int y2)
 		return false;
 }
 
-//
-// Returns true if this key is inside the given region
-//
 bool CGUI::IsMouseInRegion(RECT region)
 {
 	return IsMouseInRegion(region.left, region.top, region.left + region.right, region.top + region.bottom);
 }
 
-//
-// Returns the mouse cursor position
-//
 POINT CGUI::GetMouse()
 {
-	POINT p; p.x = Mouse.x; p.y = Mouse.y;
-	return p;
+	return Mouse;
 }
 
 bool CGUI::DrawWindow(CWindow* window)
 {
-	// Main window and title
-	Render::Clear(window->m_x, window->m_y, window->m_iWidth, window->m_iHeight, Color(25,25,25,155));
-	Render::Clear(window->m_x, window->m_y + UI_WIN_TOPHEIGHT, window->m_iWidth, UI_WIN_TITLEHEIGHT, UI_COL_MAIN);
-	Render::GradientV(window->m_x, window->m_y + UI_WIN_TOPHEIGHT, window->m_iWidth, UI_WIN_TITLEHEIGHT, UI_COL_SHADOW, UI_COL_MAIN);
-	Render::Outline(window->m_x, window->m_y + UI_WIN_TOPHEIGHT, window->m_iWidth, UI_WIN_TITLEHEIGHT, UI_COL_SHADOW);
-	Render::Outline(window->m_x - 1, window->m_y - 1, window->m_iWidth + 2, window->m_iHeight + 2, UI_COL_SHADOW);
+	Render::Outline(window->m_x, window->m_y, window->m_iWidth, window->m_iHeight, Color(21, 21, 21, 80));
+	Render::GradientV(window->m_x + 2, window->m_y + 2, window->m_iWidth - 4, 26, Color(45, 40, 40, 255), Color(45, 45, 40, 255));
+	Render::Clear(window->m_x + 2, window->m_y + 2 + 26, window->m_iWidth - 4, window->m_iHeight - 4 - 26, Color(49, 42, 42, 255));
+	Render::Outline(window->m_x + 1, window->m_y + 1, window->m_iWidth - 2, window->m_iHeight - 2, Color(49, 42, 42, 255));
+	// Main Window
+	/*Render::Outline(window->m_x, window->m_y, window->m_iWidth, window->m_iHeight, Color(21, 21, 21, 80));
+	Render::GradientV(window->m_x + 2, window->m_y + 2, window->m_iWidth - 4, 26, Color(2, 78, 0, 255), Color(7, 255, 37, 255));
+	Render::Clear(window->m_x + 2, window->m_y + 2 + 26, window->m_iWidth - 4, window->m_iHeight - 4 - 26, Color(7, 255, 37, 255));
+	Render::Outline(window->m_x + 1, window->m_y + 1, window->m_iWidth - 2, window->m_iHeight - 2, Color(91, 242, 0, 255));*/
+	Render::Text(window->m_x + 8, window->m_y + 8, Color(255, 0, 0, 255), Render::Fonts::MenuBold, window->Title.c_str());
 
-	// Close Button
-	if (IsMouseInRegion(window->m_x + window->m_iWidth - UI_WIN_CLOSE_X, window->m_y, window->m_x + window->m_iWidth, window->m_y + UI_WIN_CLOSE_X))
-		Render::Text(window->m_x + window->m_iWidth - UI_WIN_CLOSE_X, window->m_y + UI_WIN_CLOSE_Y, Color(255, 20, 20, 255), Render::Fonts::MenuWindowCloseButton, L"\u2715");
-	else
-		Render::Text(window->m_x + window->m_iWidth - UI_WIN_CLOSE_X, window->m_y + UI_WIN_CLOSE_Y, Color(50, 50, 50, 255), Render::Fonts::MenuWindowCloseButton, L"\u2715");
+	//Inner
+	//Render::Outline(window->m_x + 7, window->m_y + 1 + 26, window->m_iWidth - 4 - 10, window->m_iHeight - 2 - 6 - 26, Color(255, 255, 255, 80));
+	Render::Clear(window->m_x + 8, window->m_y + 1 + 27, window->m_iWidth - 4 - 12, window->m_iHeight - 2 - 8 - 26, Color(30, 30, 30, 255));
 
-	// Title
-	Render::Text(window->m_x + 17, window->m_y + UI_WIN_TITLEHEIGHT + 2, UI_COL_SHADOW, Render::Fonts::MenuWindowTitle, window->Title.c_str());
-	Render::Text(window->m_x + 16, window->m_y + UI_WIN_TITLEHEIGHT + 1, COL_WHITE, Render::Fonts::MenuWindowTitle, window->Title.c_str());
-
-	// Client
-	if(window->m_HasTabs)
-		Render::Clear(window->m_x + UI_TAB_WIDTH, window->m_y + UI_WIN_TOPHEIGHT + UI_WIN_TITLEHEIGHT, window->m_iWidth - UI_TAB_WIDTH, window->m_iHeight - UI_WIN_TOPHEIGHT - UI_WIN_TITLEHEIGHT, UI_COL_CLIENTBACK);
-	else
-		Render::Clear(window->m_x , window->m_y + UI_WIN_TOPHEIGHT + UI_WIN_TITLEHEIGHT, window->m_iWidth, window->m_iHeight - UI_WIN_TOPHEIGHT - UI_WIN_TITLEHEIGHT, UI_COL_CLIENTBACK);
-
-	// Tabs
+	//Tab
+	Render::GradientV(window->m_x + 8, window->m_y + 1 + 27, window->m_iWidth - 4 - 12, 29, Color(49, 42, 42, 255), Color(49, 42, 42, 255));
 	int TabCount = window->Tabs.size();
 	if (TabCount) // If there are some tabs
 	{
+		int TabSize = (window->m_iWidth - 4 - 12) / TabCount;
 		for (int i = 0; i < TabCount; i++)
 		{
-			RECT TabArea = { window->m_x, window->m_y + UI_WIN_TITLEHEIGHT + UI_WIN_TOPHEIGHT + (i*UI_TAB_HEIGHT) , UI_TAB_WIDTH, UI_TAB_HEIGHT };
+			RECT TabArea = { window->m_x + 8 + (i*TabSize), window->m_y + 1 + 27, TabSize, 29 };
 			CTab *tab = window->Tabs[i];
-
-			Render::Clear(TabArea.left, TabArea.top, UI_TAB_WIDTH, 1, UI_COL_TABSEPERATOR);
-			Color txtColor = UI_COL_TABSEPERATOR;
-			
 			if (window->SelectedTab == tab)
 			{
-				// Selected
-				txtColor = UI_COL_MAIN;
+				Render::GradientV(window->m_x + 8 + (i*TabSize), window->m_y + 1 + 27, TabSize, 29, Color(106, 106, 106, 255), Color(49, 42, 42, 255));
 			}
 			else if (IsMouseInRegion(TabArea))
 			{
-				// Hover
-				txtColor = UI_COL_SHADOW;
+				Render::GradientV(window->m_x + 8 + (i*TabSize), window->m_y + 1 + 27, TabSize, 29, Color(106, 106, 106, 255), Color(80, 80, 80, 255));
 			}
-			
-			Render::Text(TabArea.left + 32, TabArea.top + 8, txtColor, Render::Fonts::MenuWindowTab, tab->Title.c_str());
+			RECT TextSize = Render::GetTextSize(Render::Fonts::MenuBold, tab->Title.c_str());
+			Render::Text(TabArea.left + (TabSize / 2) - (TextSize.right / 2), TabArea.top + 8, Color(255, 0, 0, 255), Render::Fonts::MenuBold, tab->Title.c_str());
+			Render::Clear(window->m_x + 8, window->m_y + 1 + 27, window->m_iWidth - 4 - 12, 2, Color(62, 55, 55, 255));
 		}
 	}
+
 
 	// Controls 
 	if (window->SelectedTab != nullptr)
@@ -382,7 +335,6 @@ bool CGUI::DrawWindow(CWindow* window)
 
 			if (control != nullptr && control->Flag(UIFlags::UI_Drawable))
 			{
-				control->parent = window;
 				POINT cAbs = control->GetAbsolutePos();
 				RECT controlRect = { cAbs.x, cAbs.y, control->m_iWidth, control->m_iHeight };
 				bool hover = false;
@@ -413,6 +365,8 @@ bool CGUI::DrawWindow(CWindow* window)
 		}
 
 	}
+
+
 	return true;
 }
 
@@ -445,17 +399,14 @@ void CGUI::BindWindow(unsigned char Key, CWindow* window)
 
 void CGUI::SaveWindowState(CWindow* window, std::string Filename)
 {
-	char filenameBuffer[260];
-	//sprintf_s(filenameBuffer, "%s\\cfg\\%s.xml", BackEndInfo::g_LoaderInfo.LoaderPath, Filename.c_str());
-	sprintf_s(filenameBuffer, "%s\\cfg\\%s.xml", BackEndInfo::g_LoaderInfo.LoaderPath, Filename.c_str());
-	Filename = filenameBuffer;
-
 	// Create a whole new document and we'll just save over top of the old one
 	tinyxml2::XMLDocument Doc;
 
 	// Root Element is called "ayy"
 	tinyxml2::XMLElement *Root = Doc.NewElement("ayy");
 	Doc.LinkEndChild(Root);
+
+	Utilities::Log("Saving Window %s", window->Title.c_str());
 
 	// If the window has some tabs..
 	if (Root && window->Tabs.size() > 0)
@@ -466,6 +417,7 @@ void CGUI::SaveWindowState(CWindow* window, std::string Filename)
 			tinyxml2::XMLElement *TabElement = Doc.NewElement(Tab->Title.c_str());
 			Root->LinkEndChild(TabElement);
 
+			Utilities::Log("Saving Tab %s", Tab->Title.c_str());
 
 			// Now we itterate the controls this tab contains
 			if (TabElement && Tab->Controls.size() > 0)
@@ -473,17 +425,17 @@ void CGUI::SaveWindowState(CWindow* window, std::string Filename)
 				for (auto Control : Tab->Controls)
 				{
 					// If the control is ok to be saved
-					if (Control && Control->Flag(UIFlags::UI_SaveFile) && Control->FileID > 1 && Control->FileControlType)
+					if (Control && Control->Flag(UIFlags::UI_SaveFile) && Control->FileIdentifier.length() > 1 && Control->FileControlType)
 					{
-						char fileIdBuf[40];
-						sprintf_s(fileIdBuf, "ctrl%x", Control->FileID);
-
 						// Create an element for the control
-						tinyxml2::XMLElement *ControlElement = Doc.NewElement(fileIdBuf);
+						tinyxml2::XMLElement *ControlElement = Doc.NewElement(Control->FileIdentifier.c_str());
 						TabElement->LinkEndChild(ControlElement);
+
+						Utilities::Log("Saving control %s", Control->FileIdentifier.c_str());
 
 						if (!ControlElement)
 						{
+							Utilities::Log("Errorino :("); // s0 cute
 							return;
 						}
 
@@ -521,22 +473,16 @@ void CGUI::SaveWindowState(CWindow* window, std::string Filename)
 	//Save the file
 	if (Doc.SaveFile(Filename.c_str()) != tinyxml2::XML_NO_ERROR)
 	{
-		//MessageBox(NULL, "Failed To Save Config File!", "AyyWare", MB_OK);
-		Utilities::Log("Failed to save config file to %s", Filename.c_str());
+		MessageBox(NULL, "Failed To Save Config File!", "AyyWare", MB_OK);
 	}
 
 }
 
 void CGUI::LoadWindowState(CWindow* window, std::string Filename)
 {
-	char filenameBuffer[260];
-	sprintf_s(filenameBuffer, "%s\\cfg\\%s.xml", BackEndInfo::g_LoaderInfo.LoaderPath, Filename.c_str());
-	Filename = filenameBuffer;
-
 	// Lets load our meme
 	tinyxml2::XMLDocument Doc;
-	tinyxml2::XMLError loadErr = Doc.LoadFile(Filename.c_str());
-	if (loadErr == tinyxml2::XML_SUCCESS)
+	if (Doc.LoadFile(Filename.c_str()) == tinyxml2::XML_NO_ERROR)
 	{
 		tinyxml2::XMLElement *Root = Doc.RootElement();
 
@@ -555,16 +501,13 @@ void CGUI::LoadWindowState(CWindow* window, std::string Filename)
 						// Now we itterate the controls this tab contains
 						if (TabElement && Tab->Controls.size() > 0)
 						{
-							
 							for (auto Control : Tab->Controls)
 							{
 								// If the control is ok to be saved
-								if (Control && Control->Flag(UIFlags::UI_SaveFile) && Control->FileID && Control->FileControlType)
+								if (Control && Control->Flag(UIFlags::UI_SaveFile) && Control->FileIdentifier.length() > 1 && Control->FileControlType)
 								{
-									char fileIdBuf[40];
-									sprintf_s(fileIdBuf, "ctrl%x", Control->FileID);
 									// Get the controls element
-									tinyxml2::XMLElement *ControlElement = TabElement->FirstChildElement(fileIdBuf);
+									tinyxml2::XMLElement *ControlElement = TabElement->FirstChildElement(Control->FileIdentifier.c_str());
 
 									if (ControlElement)
 									{
@@ -594,7 +537,6 @@ void CGUI::LoadWindowState(CWindow* window, std::string Filename)
 											break;
 										}
 									}
-									
 								}
 							}
 						}
@@ -602,9 +544,5 @@ void CGUI::LoadWindowState(CWindow* window, std::string Filename)
 				}
 			}
 		}
-	}
-	else
-	{
-		Utilities::Log("Failed to open config file \"%s\" - error code %d", Filename.c_str(), loadErr);
 	}
 }

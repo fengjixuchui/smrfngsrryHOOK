@@ -1,15 +1,15 @@
 /*
-AyyWare 2 - Extreme Alien Technology
-By Syn
+Syn's AyyWare Framework
 */
 
 #pragma once
 
-#include "Common.h"
-
+// Includes
+#include "CommonIncludes.h"
+#include <time.h>
 
 // Colors for the console
-//Define extra colours (no clue where I found these)
+//Define extra colours
 #define FOREGROUND_WHITE		    (FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_GREEN)
 #define FOREGROUND_YELLOW       	(FOREGROUND_RED | FOREGROUND_GREEN)
 #define FOREGROUND_CYAN		        (FOREGROUND_BLUE | FOREGROUND_GREEN)
@@ -24,24 +24,22 @@ By Syn
 #define FOREGROUND_INTENSE_CYAN		(FOREGROUND_CYAN | FOREGROUND_INTENSITY)
 #define FOREGROUND_INTENSE_MAGENTA	(FOREGROUND_MAGENTA | FOREGROUND_INTENSITY)
 
-//
-// Ayy lmao big utils memes
-//
+// Utilities Namespace
+// Purpose: Contains misc functionality for memory related functionality
 namespace Utilities
 {
-	void OpenConsole();
-	inline void CloseConsole() { FreeConsole(); }
-
-	inline void SetConsoleColor(WORD color)
-	{
-		SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
-	}
-
+	// Debug console controls
+	void OpenConsole(std::string Title);
+	void CloseConsole();
 	void Log(const char *fmt, ...);
+
 	void EnableLogFile(std::string filename);
 
-	std::string GetTimeString();
+	void SetConsoleColor(WORD color);  
 
+	// Misc Shizz
+	std::string GetTimeString();
+	
 	// Memory utils
 	// Purpose: Provides memeory related functionality (pattern scanning ect)
 	namespace Memory
@@ -49,12 +47,11 @@ namespace Utilities
 		// Waits for a module to be available, before returning it's base address
 		DWORD WaitOnModuleHandle(std::string moduleName);
 
-		// Waits for a pointer to point to a non-zero value
-		void WaitOnValidPointer(DWORD* Pointer);
-
 		// Attempts to locate the given signature and mask in a memory range
 		// Returns the address at which it has been found
 		DWORD FindPattern(std::string moduleName, BYTE* Mask, char* szMask);
+
+		DWORD FindPatternV2(std::string moduleName, std::string pattern);
 
 		// Attempts to locate the given text in a memory range
 		// Returns the address at which it has been found
@@ -63,18 +60,37 @@ namespace Utilities
 		class VMTManager
 		{
 		private:
-			DWORD* OriginalTable;
-			DWORD* CustomTable;
-			DWORD* Instance;
+			DWORD	*CustomTable;
+			bool	initComplete;
+			DWORD	*OriginalTable;
+			DWORD	*Instance;
 
-			int MethodCount();
+			int		MethodCount(DWORD* InstancePointer);
+			
 		public:
-			~VMTManager();
+			bool	Initialise(DWORD* InstancePointer); // Pass a &class
 
-			bool	Initialise(DWORD* InstancePointer);
 			DWORD	HookMethod(DWORD NewFunction, int Index);
+			void	UnhookMethod(int Index);
+
+			void	RestoreOriginal();
+			void	RestoreCustom();
+
+			template<typename T>
+			T GetMethod(size_t nIndex)
+			{
+				return (T)OriginalTable[nIndex];
+			}
+
 			DWORD	GetOriginalFunction(int Index);
-			void	Restore();
 		};
 	};
 };
+
+template<typename T>
+FORCEINLINE T GetMethod(const void* instance, size_t index)
+{
+	uintptr_t* vmt = *(uintptr_t**)instance;
+
+	return (T)vmt[index];
+}

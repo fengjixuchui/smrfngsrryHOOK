@@ -1,12 +1,10 @@
 /*
-AyyWare 2 - Extreme Alien Technology
-By Syn
+Syn's AyyWare Framework 2015
 */
 
 #pragma once
 
 #include "GUI.h"
-#include "SDK.h"
 
 class CCheckBox : public CControl
 {
@@ -25,10 +23,8 @@ class CLabel : public CControl
 {
 public:
 	CLabel();
-	inline void SetText(std::string text) { Text = text; }
-	inline void SetTextColor(Color c) { FontColor = c; }
+	void SetText(std::string text);
 protected:
-	Color FontColor;
 	std::string Text;
 	void Draw(bool hover);
 	void OnUpdate();
@@ -40,11 +36,9 @@ class CGroupBox : public CControl
 public:
 	CGroupBox();
 	void SetText(std::string text);
-	void PlaceLabledControl(std::string Label, CTab *Tab, CControl* control, int c, int r);
-	inline void SetColumns(int c) { Columns = c; }
+	void PlaceLabledControl(std::string Label, CTab *Tab, CControl* control);
 protected:
-	int Columns;
-	int MaxRow;
+	int Items;
 	std::string Text;
 	void Draw(bool hover);
 	void OnUpdate();
@@ -68,27 +62,6 @@ protected:
 	void OnClick();
 };
 
-class CComboBox : public CControl
-{
-public:
-	CComboBox();
-	void AddItem(std::string text);
-	void SelectIndex(int idx);
-	int GetIndex();
-	std::string GetItem();
-	typedef void(*EVENT_t)(void);
-	inline void SetEventItemSelect(EVENT_t e) { OnItemSelect = e; }
-
-protected:
-	EVENT_t OnItemSelect;
-	std::vector<std::string> Items;
-	int SelectedIndex;
-	bool IsOpen;
-	void Draw(bool hover);
-	void OnUpdate();
-	void OnClick();
-};
-
 class CKeyBind : public CControl
 {
 public:
@@ -103,26 +76,33 @@ protected:
 	void OnClick();
 };
 
-class CListBox : public CControl
+class CButton : public CControl
 {
 public:
-	CListBox();
-	void AddItem(std::string text, int value = 0);
-	void SelectIndex(int idx);
-	inline int GetIndex() { return SelectedIndex; }
-	std::string GetItem();
-	inline int GetValue() { if (SelectedIndex >= 0 && SelectedIndex < Items.size()) return Values[SelectedIndex]; else return -1; };
-	inline void ClearItems() { Items.clear(); Values.clear(); }
-	void SetHeightInItems(int items);
-	inline void SelectItem(int idx) { if (idx >= 0 && idx < Items.size()) SelectedIndex = idx;}
+	typedef void(*ButtonCallback_t)(void);
+	CButton();
+	void SetCallback(ButtonCallback_t callback);
+	void SetText(std::string text);
+protected:
+	ButtonCallback_t CallBack;
+	std::string Text;
+	void Draw(bool hover);
+	void OnUpdate();
+	void OnClick();
+};
 
+class CComboBox : public CControl
+{
+public:
+	CComboBox();
+	void AddItem(std::string text);
+	void SelectIndex(int idx);
+	int GetIndex();
+	std::string GetItem();
 protected:
 	std::vector<std::string> Items;
-	std::vector<int> Values;
-
-	int ScrollTop;
-
 	int SelectedIndex;
+	bool IsOpen;
 	void Draw(bool hover);
 	void OnUpdate();
 	void OnClick();

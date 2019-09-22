@@ -1,16 +1,16 @@
-#pragma once
-//
-// Syn's "Storm" Cheat
-// Started October 2015
-//
-
-// Client interface
+/*
+Syn's AyyWare Framework 2015
+*/
 
 #pragma once
 
-#include "Valve/Vector.h"
-#include "Valve/MiscDefinitions.h"
-#include "SmallClasses.h"
+#include "MiscDefinitions.h"
+#include "ClientRecvProps.h"
+#include "offsets.h"
+#include "Vector.h"
+#include "MiscClasses.h"
+#include "Vector2D.h"
+
 
 class IMaterial
 {
@@ -79,39 +79,39 @@ public:
 
 };
 
-class CModelInfo : public Interface
+class CModelInfo
 {
 public:
 	int	GetModelIndex(const char *name)
 	{
-		typedef int(__thiscall* oGetModelName)(PVOID, const char *);
-		return VFunc< oGetModelName >(2)(this, name);
+		typedef int (__thiscall* oGetModelName)(PVOID, const char *);
+		return call_vfunc< oGetModelName >(this, 2)(this, name);
 	}
 	const char *GetModelName(const model_t *mod)
 	{
 		typedef const char *(__thiscall* oGetModelName)(PVOID, const model_t*);
-		return VFunc< oGetModelName >(3)(this, mod);
+		return call_vfunc< oGetModelName >(this, Offsets::VMT::ModelInfo_GetModelName)(this, mod);
 	}
 
 	studiohdr_t	*GetStudiomodel(const model_t *mod)
 	{
 		typedef studiohdr_t *(__stdcall* oGetStudiomodel)(const model_t*);
-		return VFunc< oGetStudiomodel >(30)(mod);
+		return call_vfunc< oGetStudiomodel >(this, Offsets::VMT::ModelInfo_GetStudiomodel)(mod);
 	}
 };
 
-class CVRenderView : public Interface
+class CVRenderView
 {
 public:
 	void SetBlend(float alpha)
 	{
 		typedef void(__thiscall* oDrawModelExecute)(PVOID, float);
-		return VFunc< oDrawModelExecute >(4)(this, alpha);
+		return call_vfunc< oDrawModelExecute >(this, Offsets::VMT::RenderView_SetBlend)(this, alpha);
 	}
 
 	void SetColorModulation(float const* colors)
 	{
 		typedef void(__thiscall* oDrawModelExecute)(PVOID, float const*);
-		return VFunc< oDrawModelExecute >(6)(this, colors);
+		return call_vfunc< oDrawModelExecute >(this, Offsets::VMT::RenderView_SetColorModulation)(this, colors);
 	}
 };

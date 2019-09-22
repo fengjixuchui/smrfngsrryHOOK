@@ -1,25 +1,29 @@
-/*
-AyyWare 2 - Extreme Alien Technology
-By Syn
-*/
+// Don't take credits for this ;) Joplin / Manhhao are the first uploaders ;)
 
 #include "ESP.h"
 #include "Interfaces.h"
-#include "Render.h"
-#include "Menu.h"
+#include "RenderManager.h"
 
-void CEsp::Setup()
+void CEsp::Init()
 {
 	BombCarrier = nullptr;
 }
 
 // Yeah dude we're defo gunna do some sick moves for the esp yeah
-void CEsp::Move(CUserCmd *pCmd) {}
+void CEsp::Move(CUserCmd *pCmd,bool &bSendPacket) 
+{
+
+}
 
 // Main ESP Drawing loop
 void CEsp::Draw()
 {
-	IClientEntity *pLocal = HackManager.pLocal();
+	IClientEntity *pLocal = hackManager.pLocal();
+
+	if (Menu::Window.MiscTab.OtherSpectators.GetState())
+	{
+		SpecList();
+	}
 
 	// Loop through all active entitys
 	for (int i = 0; i < Interfaces::EntList->GetHighestEntityIndex(); i++)
@@ -31,6 +35,13 @@ void CEsp::Draw()
 		// The entity isn't some laggy peice of shit or something
 		if (pEntity &&  pEntity != pLocal && !pEntity->IsDormant())
 		{
+			// Radar
+			if (Menu::Window.VisualsTab.OtherRadar.GetState())
+			{
+				DWORD m_bSpotted = NetVar.GetNetVar(0x839EB159);
+				*(char*)((DWORD)(pEntity) + m_bSpotted) = 1;
+			}
+
 			// Is it a player?!
 			if (Menu::Window.VisualsTab.FiltersPlayers.GetState() && Interfaces::Engine->GetPlayerInfo(i, &pinfo) && pEntity->IsAlive())
 			{
@@ -64,6 +75,58 @@ void CEsp::Draw()
 			}
 		}
 	}
+
+	// Anti Flash
+	if (Menu::Window.VisualsTab.OtherNoFlash.GetState())
+	{
+		DWORD m_flFlashMaxAlpha = NetVar.GetNetVar(0xFE79FB98);
+		*(float*)((DWORD)pLocal + m_flFlashMaxAlpha) = 0;
+	}
+}
+
+void CEsp::SpecList()
+{
+	IClientEntity *pLocal = hackManager.pLocal();
+
+	RECT scrn = Render::GetViewport();
+	int ayy = 0;
+
+	// Loop through all active entitys
+	for (int i = 0; i < Interfaces::EntList->GetHighestEntityIndex(); i++)
+	{
+		// Get the entity
+		IClientEntity *pEntity = Interfaces::EntList->GetClientEntity(i);
+		player_info_t pinfo;
+
+		// The entity isn't some laggy peice of shit or something
+		if (pEntity &&  pEntity != pLocal)
+		{
+			if (Interfaces::Engine->GetPlayerInfo(i, &pinfo) && !pEntity->IsAlive() && !pEntity->IsDormant())
+			{
+				HANDLE obs = pEntity->GetObserverTargetHandle();
+
+				if (obs)
+				{
+					IClientEntity *pTarget = Interfaces::EntList->GetClientEntityFromHandle(obs);
+					player_info_t pinfo2;
+					if (pTarget)
+					{
+						if (Interfaces::Engine->GetPlayerInfo(pTarget->GetIndex(), &pinfo2))
+						{
+							char buf[255]; sprintf_s(buf, "%s => %s", pinfo.name, pinfo2.name);
+							RECT TextSize = Render::GetTextSize(Render::Fonts::ESP, buf);
+							Render::Clear(scrn.right - 260, (scrn.bottom / 2) + (16 * ayy), 260, 16, Color(0, 0, 0, 140));
+							Render::Text(scrn.right - TextSize.right - 4, (scrn.bottom / 2) + (16 * ayy), pTarget->GetIndex() == pLocal->GetIndex() ? Color(240, 70, 80, 255) : Color(255, 255, 255, 255), Render::Fonts::ESP, buf);
+							ayy++;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	Render::Outline(scrn.right - 261, (scrn.bottom / 2) - 1, 262, (16 * ayy) + 2, Color(23, 23, 23, 255));
+	Render::Outline(scrn.right - 260, (scrn.bottom / 2), 260, (16 * ayy), Color(90, 90, 90, 255));
 }
 
 //  Yeah m8
@@ -72,13 +135,27 @@ void CEsp::DrawPlayer(IClientEntity* pEntity, player_info_t pinfo)
 	ESPBox Box;
 	Color Color;
 
-	// Show own team false? well gtfo teammate
-	if (Menu::Window.VisualsTab.FiltersEnemiesOnly.GetState() && (pEntity->GetTeamNum() == HackManager.pLocal()->GetTeamNum()))
+	// Show own team false? well gtfo teammate lol
+	if (Menu::Window.VisualsTab.FiltersEnemiesOnly.GetState() && (pEntity->GetTeamNum() == hackManager.pLocal()->GetTeamNum()))
 		return;
 
-	if (GetPlayerBox(pEntity, Box))
+	if (GetBox(pEntity, Box))
 	{
 		Color = GetPlayerColor(pEntity);
+
+		/*if (Menu::Window.VisualsTab.OptionsGlow.GetState())
+		{
+			int TeamNum = pEntity->GetTeamNum();
+
+			if (TeamNum == TEAM_CS_T)
+			{
+				DrawGlow(pEntity, 255, 0, 0, 160);
+			}
+			else if (TeamNum == TEAM_CS_CT)
+			{
+				DrawGlow(pEntity, 0, 0, 255, 160);
+			}
+		}*/
 
 		if (Menu::Window.VisualsTab.OptionsBox.GetState())
 			DrawBox(Box, Color);
@@ -99,6 +176,45 @@ void CEsp::DrawPlayer(IClientEntity* pEntity, player_info_t pinfo)
 			DrawSkeleton(pEntity);
 	}
 }
+
+// glow shit
+/*struct Glowobject
+{
+	IClientEntity* pEntity;
+	Vector Color;
+	float Alpha;
+	byte PAD[16];
+	bool RenderWhenOccluded;
+	bool RenderWhenUnOccluded;
+	bool FullBloomRender;
+	byte PAD2[17];
+};
+
+// simple sexy glow
+void CEsp::DrawGlow(IClientEntity *pEntity, int r, int g, int b, int a)
+{
+	static uintptr_t Module = (uintptr_t)GetModuleHandle("client_panorama.dll");
+
+	Glowobject* GlowManager = *(Glowobject**)(Module + 0x4B71C6C);
+
+	if (GlowManager)
+	{
+		Glowobject* GlowObject = &GlowManager[pEntity->GetGlowIndex()];
+
+		if (GlowObject)
+		{
+			GlowObject->RenderWhenOccluded = 1;
+			GlowObject->RenderWhenUnOccluded = 0;
+
+			float glowr = (1 / 255.0f)*r;
+			float glowg = (1 / 255.0f)*g;
+			float glowb = (1 / 255.0f)*b;
+			float glowa = (1 / 255.0f)*a;
+			GlowObject->Color = Vector((1 / 255.0f)*r, (1 / 255.0f)*g, (1 / 255.0f)*b);
+			GlowObject->Alpha = (1 / 255.0f)*a;
+		}
+	}
+}*/
 
 // Gets the 2D bounding box for the entity
 // Returns false on failure nigga don't fail me
@@ -162,30 +278,11 @@ bool CEsp::GetBox(IClientEntity* pEntity, CEsp::ESPBox &result)
 	return true;
 }
 
-// Less accurate in terms of the size but the positioning should be better
-bool CEsp::GetPlayerBox(IClientEntity* pEntity, ESPBox &result)
-{
-	Vector wOrig, wHead, sOrig, sHead;
-	wOrig = pEntity->GetOrigin();
-	wHead = pEntity->GetHeadPos() + Vector(0,0,7.f);
-
-	if (!Render::WorldToScreen(wOrig, sOrig) || !Render::WorldToScreen(wHead, sHead))
-		return false;
-
-	float Height = sOrig.y - sHead.y;
-	float Width = Height * 0.6;
-
-	result.x = sHead.x - (Width / 2.f);
-	result.y = sHead.y;
-	result.w = Width;
-	result.h = Height;
-}
-
 // Get an entities color depending on team and vis ect
 Color CEsp::GetPlayerColor(IClientEntity* pEntity)
 {
 	int TeamNum = pEntity->GetTeamNum();
-	bool IsVis = IsVisible(HackManager.pLocal(), pEntity, (int)CSGOHitboxID::Head);
+	bool IsVis = GameUtils::IsVisible(hackManager.pLocal(), pEntity, (int)CSGOHitboxID::Head);
 
 	Color color;
 
@@ -213,45 +310,47 @@ void CEsp::DrawBox(CEsp::ESPBox size, Color color)
 {
 	//if (PlayerBoxes->GetStringIndex() == 1)
 	//{
-	//	// Full Box
-	//	renderMan->Outline(size.x, size.y, size.w, size.h, color);
-	//	renderMan->Outline(size.x - 1, size.y - 1, size.w + 2, size.h + 2, COLORCODE(10, 10, 10, 150));
-	//	renderMan->Outline(size.x + 1, size.y + 1, size.w - 2, size.h - 2, COLORCODE(10, 10, 10, 150));
+		// Full Box
+	//Render::Clear(size.x, size.y, size.w, size.h, color);
+	//Render::Clear(size.x - 1, size.y - 1, size.w + 2, size.h + 2, Color(10, 10, 10, 150)); 
+	//Render::Clear(size.x + 1, size.y + 1, size.w - 2, size.h - 2, Color(10, 10, 10, 150));
 	//}
 	//else
-	//{
-	// Corner Box
-	int VertLine = (((float)size.w) * (0.20f));
-	int HorzLine = (((float)size.h) * (0.20f));
+	{
+		// Corner Box
+		int VertLine = (((float)size.w) * (0.20f));
+		int HorzLine = (((float)size.h) * (0.20f));
 
-	Render::Clear(size.x, size.y - 1, VertLine, 1, Color(10, 10, 10, 150));
-	Render::Clear(size.x + size.w - VertLine, size.y - 1, VertLine, 1, Color(10, 10, 10, 150));
-	Render::Clear(size.x, size.y + size.h - 1, VertLine, 1, Color(10, 10, 10, 150));
-	Render::Clear(size.x + size.w - VertLine, size.y + size.h - 1, VertLine, 1, Color(10, 10, 10, 150));
+		Render::Clear(size.x, size.y - 1, VertLine, 1, Color(10, 10, 10, 150));
+		Render::Clear(size.x + size.w - VertLine, size.y - 1, VertLine, 1, Color(10, 10, 10, 150));
+		Render::Clear(size.x, size.y + size.h - 1, VertLine, 1, Color(10, 10, 10, 150));
+		Render::Clear(size.x + size.w - VertLine, size.y + size.h - 1, VertLine, 1, Color(10, 10, 10, 150));
 
-	Render::Clear(size.x - 1, size.y, 1, HorzLine, Color(10, 10, 10, 150));
-	Render::Clear(size.x - 1, size.y + size.h - HorzLine, 1, HorzLine, Color(10, 10, 10, 150));
-	Render::Clear(size.x + size.w - 1, size.y, 1, HorzLine, Color(10, 10, 10, 150));
-	Render::Clear(size.x + size.w - 1, size.y + size.h - HorzLine, 1, HorzLine, Color(10, 10, 10, 150));
+		Render::Clear(size.x - 1, size.y, 1, HorzLine, Color(10, 10, 10, 150));
+		Render::Clear(size.x - 1, size.y + size.h - HorzLine, 1, HorzLine, Color(10, 10, 10, 150));
+		Render::Clear(size.x + size.w - 1, size.y, 1, HorzLine, Color(10, 10, 10, 150));
+		Render::Clear(size.x + size.w - 1, size.y + size.h - HorzLine, 1, HorzLine, Color(10, 10, 10, 150));
 
-	Render::Clear(size.x, size.y, VertLine, 1, color);
-	Render::Clear(size.x + size.w - VertLine, size.y, VertLine, 1, color);
-	Render::Clear(size.x, size.y + size.h, VertLine, 1, color);
-	Render::Clear(size.x + size.w - VertLine, size.y + size.h, VertLine, 1, color);
+		Render::Clear(size.x, size.y, VertLine, 1, color);
+		Render::Clear(size.x + size.w - VertLine, size.y, VertLine, 1, color);
+		Render::Clear(size.x, size.y + size.h, VertLine, 1, color);
+		Render::Clear(size.x + size.w - VertLine, size.y + size.h, VertLine, 1, color);
 
-	Render::Clear(size.x, size.y, 1, HorzLine, color);
-	Render::Clear(size.x, size.y + size.h - HorzLine, 1, HorzLine, color);
-	Render::Clear(size.x + size.w, size.y, 1, HorzLine, color);
-	Render::Clear(size.x + size.w, size.y + size.h - HorzLine, 1, HorzLine, color);
-	//}
+		Render::Clear(size.x, size.y, 1, HorzLine, color);
+		Render::Clear(size.x, size.y + size.h - HorzLine, 1, HorzLine, color);
+		Render::Clear(size.x + size.w, size.y, 1, HorzLine, color);
+		Render::Clear(size.x + size.w, size.y + size.h - HorzLine, 1, HorzLine, color);
+	}
 }
 
-std::wstring stringToWide(const std::string& text)
-{
-	std::wstring wide(text.length(), L' ');
-	std::copy(text.begin(), text.end(), wide.begin());
 
-	return wide;
+// Unicode Conversions
+static wchar_t* CharToWideChar(const char* text)
+{
+	size_t size = strlen(text) + 1;
+	wchar_t* wa = new wchar_t[size];
+	mbstowcs_s(NULL, wa, size/4, text, size);
+	return wa;
 }
 
 // Player name
@@ -259,9 +358,10 @@ void CEsp::DrawName(player_info_t pinfo, CEsp::ESPBox size)
 {
 	RECT nameSize = Render::GetTextSize(Render::Fonts::ESP, pinfo.name);
 	Render::Text(size.x + (size.w / 2) - (nameSize.right / 2), size.y - 16,
-		Color(255, 255, 255, 255), Render::Fonts::ESP, stringToWide(pinfo.name).c_str());
+		Color(255, 255, 255, 255), Render::Fonts::ESP, pinfo.name);
 }
 
+// Draw a health bar. For Tf2 when a bar is bigger than max health a second bar is displayed
 void CEsp::DrawHealth(IClientEntity* pEntity, CEsp::ESPBox size)
 {
 	ESPBox HealthBar = size;
@@ -330,10 +430,7 @@ void CEsp::DrawInfo(IClientEntity* pEntity, CEsp::ESPBox size)
 		if (cClass)
 		{
 			// Draw it
-			std::string meme = CleanItemName(cClass->m_pNetworkName);
-			RECT nameSize = Render::GetTextSize(Render::Fonts::ESP, meme.c_str());
-			Render::Text(size.x + (size.w / 2) - (nameSize.right / 2), size.y + size.h + 16,
-				Color(255, 255, 255, 255), Render::Fonts::ESP, meme.c_str());
+			Info.push_back(CleanItemName(cClass->m_pNetworkName));
 		}
 	}
 
@@ -341,49 +438,6 @@ void CEsp::DrawInfo(IClientEntity* pEntity, CEsp::ESPBox size)
 	if (Menu::Window.VisualsTab.OptionsInfo.GetState() && pEntity == BombCarrier)
 	{
 		Info.push_back("Bomb Carrier");
-	}
-	
-
-	// Comp Rank
-	if (Menu::Window.VisualsTab.OptionsInfo.GetState())
-	{
-		int CompRank = GetPlayerCompRank(pEntity);
-		static const char *Ranks[] =
-		{
-			" ",
-			"Silver I",
-			"Silver II",
-			"Silver III",
-			"Silver IV",
-			"Silver Elite",
-			"Silver Elite Master",
-
-			"Gold Nova I",
-			"Gold Nova II",
-			"Gold Nova III",
-			"Gold Nova Master",
-			"Master Guardian I",
-			"Master Guardian II",
-
-			"Master Guardian Elite",
-			"Distinguished Master Guardian",
-			"Legendary Eagle",
-			"Legendary Eagle Master",
-			"Supreme Master First Class",
-			"Global Elite"
-		};
-		if (CompRank >= 0 && CompRank <= 18)
-			Info.push_back(Ranks[CompRank]);
-
-		if (IsFriendly(pEntity->GetIndex()))
-		{
-			Info.push_back("Friendly");
-		}
-
-		if (IsAimPrio(pEntity->GetIndex()))
-		{
-			Info.push_back("Priorety Target");
-		}
 	}
 
 	static RECT Size = Render::GetTextSize(Render::Fonts::Default, "Hi");
@@ -393,7 +447,6 @@ void CEsp::DrawInfo(IClientEntity* pEntity, CEsp::ESPBox size)
 		Render::Text(size.x + size.w + 3, size.y + (i*(Size.bottom + 2)), Color(255, 255, 255, 255), Render::Fonts::ESP, Text.c_str());
 		i++;
 	}
-
 }
 
 // Little cross on their heads
@@ -442,7 +495,7 @@ void CEsp::DrawChicken(IClientEntity* pEntity, ClientClass* cClass)
 	{
 		player_info_t pinfo; strcpy_s(pinfo.name, "Chicken");
 		if (Menu::Window.VisualsTab.OptionsBox.GetState())
-			DrawBox(Box, Color(255, 255, 255, 255));
+			DrawBox(Box, Color(255,255,255,255));
 
 		if (Menu::Window.VisualsTab.OptionsName.GetState())
 			DrawName(pinfo, Box);
@@ -450,7 +503,7 @@ void CEsp::DrawChicken(IClientEntity* pEntity, ClientClass* cClass)
 }
 
 // Draw the planted bomb and timer
-void CEsp::DrawBombPlanted(IClientEntity* pEntity, ClientClass* cClass)
+void CEsp::DrawBombPlanted(IClientEntity* pEntity, ClientClass* cClass) 
 {
 	// Null it out incase bomb has been dropped or planted
 	BombCarrier = nullptr;
@@ -462,7 +515,7 @@ void CEsp::DrawBombPlanted(IClientEntity* pEntity, ClientClass* cClass)
 	if (Render::WorldToScreen(vOrig, vScreen))
 	{
 		float flBlow = Bomb->GetC4BlowTime();
-		float TimeRemaining = flBlow - (Interfaces::Globals->interval_per_tick * HackManager.pLocal()->GetTickBase());
+		float TimeRemaining = flBlow - (Interfaces::Globals->interval_per_tick * hackManager.pLocal()->GetTickBase());
 		char buffer[64];
 		sprintf_s(buffer, "Bomb: %.1f", TimeRemaining);
 		Render::Text(vScreen.x, vScreen.y, Color(250, 42, 42, 255), Render::Fonts::ESP, buffer);
@@ -552,7 +605,7 @@ void CEsp::DrawSkeleton(IClientEntity* pEntity)
 
 			if (Render::WorldToScreen(vParent, sParent) && Render::WorldToScreen(vChild, sChild))
 			{
-				Render::Line(sParent[0], sParent[1], sChild[0], sChild[1], Color(255, 255, 255, 255));
+				Render::Line(sParent[0], sParent[1], sChild[0], sChild[1], Color(255,255,255,255));
 			}
 		}
 	}

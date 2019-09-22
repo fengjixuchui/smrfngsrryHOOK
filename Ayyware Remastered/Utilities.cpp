@@ -1,25 +1,37 @@
 /*
-AyyWare 2 - Extreme Alien Technology
-By Syn
+Syn's AyyWare Framework
 */
-
+#pragma once
 #define _CRT_SECURE_NO_WARNINGS
 
+// Includes
 #include "Utilities.h"
-
 #include <fstream>
 #include <Psapi.h>
 
 bool FileLog = false;
 std::ofstream logFile;
 
+#define INRANGE(x,a,b)    (x >= a && x <= b) 
+#define getBits( x )    (INRANGE((x&(~0x20)),'A','F') ? ((x&(~0x20)) - 'A' + 0xa) : (INRANGE(x,'0','9') ? x - '0' : 0))
+#define getByte( x )    (getBits(x[0]) << 4 | getBits(x[1]))
+
+// --------         Utilities Core           ------------ //
 // Opens a debug console
-void Utilities::OpenConsole()
+void Utilities::OpenConsole(std::string Title)
 {
 	AllocConsole();
 	freopen("CONIN$", "r", stdin);
 	freopen("CONOUT$", "w", stdout);
 	freopen("CONOUT$", "w", stderr);
+
+	SetConsoleTitle(Title.c_str());
+}
+
+// Closes the debug console
+void Utilities::CloseConsole()
+{
+	FreeConsole();
 }
 
 // Outputs text to the console
@@ -46,19 +58,10 @@ void Utilities::Log(const char *fmt, ...)
 		printf(": %s\n", logBuf);
 	}
 
-	// Also outout to file if we need to
 	if (FileLog)
 	{
 		logFile << logBuf << std::endl;
 	}
-}
-
-// Enables writing all log calls to a file
-void Utilities::EnableLogFile(std::string filename)
-{
-	logFile.open(filename.c_str());
-	if (logFile.is_open())
-		FileLog = true;
 }
 
 // Gets the current time as a string
@@ -78,7 +81,22 @@ std::string Utilities::GetTimeString()
 	return timeString;
 }
 
-// --------Utilities Memory------------ //
+// Sets the console color for upcoming text
+void Utilities::SetConsoleColor(WORD color)
+{
+	SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), color);
+}
+
+// Enables writing all log calls to a file
+void Utilities::EnableLogFile(std::string filename)
+{
+	logFile.open(filename.c_str());
+	if (logFile.is_open())
+		FileLog = true;
+}
+
+
+// --------         Utilities Memory           ------------ //
 
 DWORD Utilities::Memory::WaitOnModuleHandle(std::string moduleName)
 {
@@ -87,24 +105,11 @@ DWORD Utilities::Memory::WaitOnModuleHandle(std::string moduleName)
 	{
 		ModuleHandle = (DWORD)GetModuleHandle(moduleName.c_str());
 		if (!ModuleHandle)
-			Sleep(100);
+			Sleep(50);
 	}
 	return ModuleHandle;
 }
 
-void Utilities::Memory::WaitOnValidPointer(DWORD* Pointer)
-{
-	DWORD** ppTemp = (DWORD**)Pointer;
-	if (*ppTemp == nullptr)
-	{
-		while (*ppTemp == nullptr)
-		{
-			Sleep(100);
-		}
-	}
-}
-
-// God knows who made these ancient peices of shit, but they get the job done
 bool bCompare(const BYTE* Data, const BYTE* Mask, const char* szMask)
 {
 	for (; *szMask; ++szMask, ++Mask, ++Data)
@@ -122,7 +127,6 @@ DWORD Utilities::Memory::FindPattern(std::string moduleName, BYTE* Mask, char* s
 	DWORD Address = WaitOnModuleHandle(moduleName.c_str());
 	MODULEINFO ModInfo; GetModuleInformation(GetCurrentProcess(), (HMODULE)Address, &ModInfo, sizeof(MODULEINFO));
 	DWORD Length = ModInfo.SizeOfImage;
-
 	for (DWORD c = 0; c < Length; c += 1)
 	{
 		if (bCompare((BYTE*)(Address + c), Mask, szMask))
@@ -133,13 +137,47 @@ DWORD Utilities::Memory::FindPattern(std::string moduleName, BYTE* Mask, char* s
 	return 0;
 }
 
+DWORD Utilities::Memory::FindPatternV2(std::string moduleName, std::string pattern)
+{
+	const char* pat = pattern.c_str();
+	DWORD firstMatch = 0;
+	DWORD rangeStart = (DWORD)GetModuleHandleA(moduleName.c_str());
+	MODULEINFO miModInfo; GetModuleInformation(GetCurrentProcess(), (HMODULE)rangeStart, &miModInfo, sizeof(MODULEINFO));
+	DWORD rangeEnd = rangeStart + miModInfo.SizeOfImage;
+	for (DWORD pCur = rangeStart; pCur < rangeEnd; pCur++)
+	{
+		if (!*pat)
+			return firstMatch;
+
+		if (*(PBYTE)pat == '\?' || *(BYTE*)pCur == getByte(pat))
+		{
+			if (!firstMatch)
+				firstMatch = pCur;
+
+			if (!pat[2])
+				return firstMatch;
+
+			if (*(PWORD)pat == '\?\?' || *(PBYTE)pat != '\?')
+				pat += 3;
+
+			else
+				pat += 2;
+		}
+		else
+		{
+			pat = pattern.c_str();
+			firstMatch = 0;
+		}
+	}
+	return NULL;
+}
+
 DWORD Utilities::Memory::FindTextPattern(std::string moduleName, char* string)
 {
 	DWORD Address = WaitOnModuleHandle(moduleName.c_str());
 	MODULEINFO ModInfo; GetModuleInformation(GetCurrentProcess(), (HMODULE)Address, &ModInfo, sizeof(MODULEINFO));
 	DWORD Length = ModInfo.SizeOfImage;
 
-	// GHETTO AS FUCK LOL
 	int len = strlen(string);
 	char* szMask = new char[len + 1];
 	for (int i = 0; i < len; i++)
@@ -158,46 +196,48 @@ DWORD Utilities::Memory::FindTextPattern(std::string moduleName, char* string)
 	return 0;
 }
 
-int Utilities::Memory::VMTManager::MethodCount()
-{
-	size_t Index = 0;
+// --------         Utilities Memory VMT Manager       ------------ //
 
-	while (!IsBadCodePtr((FARPROC)OriginalTable[Index]))
-	{
-		if (!IsBadCodePtr((FARPROC)OriginalTable[Index]))
-		{
-			Index++;
-		}
-	}
-	return Index;
-}
-
-bool Utilities::Memory::VMTManager::Initialise(DWORD* InstancePointer)
+bool	Utilities::Memory::VMTManager::Initialise(DWORD* InstancePointer)
 {
+	// Store the instance pointers and such, and work out how big the table is
 	Instance = InstancePointer;
 	OriginalTable = (DWORD*)*InstancePointer;
+	int VMTSize = MethodCount(InstancePointer);
+	size_t TableBytes = VMTSize * 4;
 
-	size_t Index = MethodCount() * 4;
-
-	CustomTable = new DWORD[Index];
+	// Allocate some memory and copy the table
+	CustomTable = (DWORD*)malloc(TableBytes + 8);
 	if (!CustomTable) return false;
-	memcpy((void*)CustomTable, (void*)OriginalTable, Index);
+	memcpy((void*)CustomTable, (void*)OriginalTable, VMTSize * 4);
 
+	// Change the pointer
 	*InstancePointer = (DWORD)CustomTable;
+
+	initComplete = true;
 	return true;
 }
 
-Utilities::Memory::VMTManager::~VMTManager()
+int		Utilities::Memory::VMTManager::MethodCount(DWORD* InstancePointer)
 {
-	if (CustomTable)
+	DWORD *VMT = (DWORD*)*InstancePointer;
+	int Index = 0;
+	int Amount = 0;
+	while (!IsBadCodePtr((FARPROC)VMT[Index]))
 	{
-		free(CustomTable);
+		if (!IsBadCodePtr((FARPROC)VMT[Index]))
+		{
+			Amount++;
+			Index++;
+		}
 	}
+
+	return Amount;
 }
 
 DWORD	Utilities::Memory::VMTManager::HookMethod(DWORD NewFunction, int Index)
 {
-	if (CustomTable)
+	if (initComplete)
 	{
 		CustomTable[Index] = NewFunction;
 		return OriginalTable[Index];
@@ -206,12 +246,32 @@ DWORD	Utilities::Memory::VMTManager::HookMethod(DWORD NewFunction, int Index)
 		return NULL;
 }
 
+void	Utilities::Memory::VMTManager::UnhookMethod(int Index)
+{
+	if (initComplete)
+		CustomTable[Index] = OriginalTable[Index];
+	return;
+}
+
+void	Utilities::Memory::VMTManager::RestoreOriginal()
+{
+	if (initComplete)
+	{
+		*Instance = (DWORD)OriginalTable;
+	}
+	return;
+}
+
+void	Utilities::Memory::VMTManager::RestoreCustom()
+{
+	if (initComplete)
+	{
+		*Instance = (DWORD)CustomTable;
+	}
+	return;
+}
+
 DWORD	Utilities::Memory::VMTManager::GetOriginalFunction(int Index)
 {
 	return OriginalTable[Index];
-}
-
-void	Utilities::Memory::VMTManager::Restore()
-{
-	*Instance = (DWORD)OriginalTable;
 }

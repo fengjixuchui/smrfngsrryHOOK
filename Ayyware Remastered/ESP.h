@@ -1,18 +1,17 @@
 /*
-AyyWare 2 - Extreme Alien Technology
-By Syn
+Syn's AyyWare Framework 2015
 */
 
 #pragma once
 
 #include "Hacks.h"
 
-class CEsp : public Hack
+class CEsp : public CHack
 {
 public:
-	void Setup();
+	void Init();
 	void Draw();
-	void Move(CUserCmd *pCmd);
+	void Move(CUserCmd *pCmd, bool &bSendPacket);
 private:
 
 	// Other shit
@@ -29,10 +28,10 @@ private:
 	// Get player info
 	Color GetPlayerColor(IClientEntity* pEntity);
 	bool GetBox(IClientEntity* pEntity, ESPBox &result);
-	bool GetPlayerBox(IClientEntity* pEntity, ESPBox &result);
-
 
 	// Draw shit about player
+	void SpecList();
+	void DrawGlow(IClientEntity *pEntity, int r, int g, int b, int a);
 	void DrawBox(ESPBox size, Color color);
 	void DrawName(player_info_t pinfo, ESPBox size);
 	void DrawHealth(IClientEntity* pEntity, ESPBox size);

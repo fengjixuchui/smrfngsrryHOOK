@@ -1,15 +1,15 @@
 /*
-AyyWare 2 - Extreme Alien Technology
-By Syn
+Syn's AyyWare Framework 2015
 */
 
 #pragma once
 
-#include "VFuncs.h"
-#include "Valve/Vector.h"
-#include "Valve/Vector2D.h"
-#include "Offsets.h"
-#include "SmallClasses.h"
+#include "MiscDefinitions.h"
+#include "ClientRecvProps.h"
+#include "offsets.h"
+#include "Vector.h"
+#include "MiscClasses.h"
+#include "Vector2D.h"
 
 struct Vertex_t
 {
@@ -80,13 +80,13 @@ public:
 	void DrawSetTextColor(int r, int g, int b, int a)
 	{
 		typedef void(__thiscall* OriginalFn)(PVOID, int, int, int, int);
-		call_vfunc< OriginalFn >(this, Offsets::VMT::Surface_DrawSetTextColorRGB)(this, r, g, b, a);
+		call_vfunc< OriginalFn >(this, Offsets::VMT::Surface_DrawSetTextColorB)(this, r, g, b, a);
 	}
 
 	void DrawSetTextColor(Color col)
 	{
 		typedef void(__thiscall* oDrawSetTextColor)(PVOID, Color);
-		return call_vfunc< oDrawSetTextColor >(this, Offsets::VMT::Surface_DrawSetTextColorCol)(this, col);
+		return call_vfunc< oDrawSetTextColor >(this, Offsets::VMT::Surface_DrawSetTextColorA)(this, col);
 	}
 
 	void DrawSetTextPos(int x, int y)

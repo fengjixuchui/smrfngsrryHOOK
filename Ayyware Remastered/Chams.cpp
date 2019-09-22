@@ -1,37 +1,34 @@
-/*
-Syn's AyyWare Framework 2015
-*/
+// Don't take credits for this ;) Joplin / Manhhao are the first uploaders ;)
 
 #include "Chams.h"
 #include "offsets.h"
 #include "SDK.h"
 #include "Interfaces.h"
 
-
 void InitKeyValues(KeyValues* keyValues, char* name)
 {
-	DWORD dwFunction = (DWORD)Offsets::SigScans::dwKeyValues_KeyValues;
+	DWORD dwFunction = (DWORD)Offsets::Functions::KeyValues_KeyValues;
 	__asm
 	{
 		push name
-		mov ecx, keyValues
-		call dwFunction
+			mov ecx, keyValues
+			call dwFunction
 	}
 }
 
 void LoadFromBuffer(KeyValues* keyValues, char const *resourceName, const char *pBuffer)
 {
-	DWORD dwFunction = (DWORD)Offsets::SigScans::dwKeyValues_LoadFromBuffer;
+	DWORD dwFunction = (DWORD)Offsets::Functions::KeyValues_LoadFromBuffer;
 
 	__asm
 	{
 		push 0
-		push 0
-		push 0
-		push pBuffer
-		push resourceName
-		mov ecx, keyValues
-		call dwFunction
+			push 0
+			push 0
+			push pBuffer
+			push resourceName
+			mov ecx, keyValues
+			call dwFunction
 	}
 }
 

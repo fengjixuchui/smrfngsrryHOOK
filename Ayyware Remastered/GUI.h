@@ -1,11 +1,12 @@
 /*
-AyyWare 2 - Extreme Alien Technology
-By Syn
+Syn's AyyWare Framework 2015
 */
 
 #pragma once
 
-#include "Common.h"
+#include "CommonIncludes.h"
+
+#include <map>
 
 class CControl;
 class CTab;
@@ -14,22 +15,16 @@ class CGUI;
 
 extern CGUI GUI;
 
-//
-// Flags set by control types
-//
 enum UIFlags
 {
-	UI_None = 0x00, // No Flags
-	UI_Drawable = 0x01, // This control should be drawn
-	UI_Clickable = 0x02, // This control has a click event
-	UI_Focusable = 0x04, // This control can hold an input focus
-	UI_RenderFirst = 0x08, // This control should be drawn under all others
-	UI_SaveFile = 0x10 // This control can be saved to the config files
+	UI_None = 0x00,
+	UI_Drawable = 0x01,
+	UI_Clickable = 0x02,
+	UI_Focusable = 0x04,
+	UI_RenderFirst = 0x08,
+	UI_SaveFile = 0x10
 };
 
-//
-// Types of controls
-//
 enum UIControlTypes
 {
 	UIC_CheckBox = 1,
@@ -45,19 +40,20 @@ class CControl
 	friend class CTab;
 	friend class CWindow;
 public:
-	inline void SetPosition(int x, int y) { m_x = x; m_y = y; }
-	inline void SetSize(int w, int h) { m_iWidth = w; m_iHeight = h; }
-	inline void GetSize(int &w, int &h) { w = m_iWidth; h = m_iHeight; }
-	inline void SetFileID(DWORD ID) { FileID = ID; }
+	void SetPosition(int x, int y);
+	void SetSize(int w, int h);
+	void GetSize(int &w, int &h);
+	void SetFileId(std::string fid);
 
 	bool Flag(int f);
 protected:
 	int m_x, m_y;
 	int m_iWidth, m_iHeight;
 	int m_Flags;
-	DWORD FileID;
-	int FileControlType;
 	CWindow* parent;
+
+	std::string FileIdentifier;
+	int FileControlType;
 
 	virtual void Draw(bool) = 0;
 	virtual void OnUpdate() = 0;
@@ -73,9 +69,8 @@ class CTab
 	friend class CGUI;
 	friend class CWindow;
 public:
-	inline void SetTitle(std::string name) { Title = name; }
+	void SetTitle(std::string name);
 	void RegisterControl(CControl* control);
-	int GetNextGroupboxY(CControl* control);
 private:
 	std::string Title;
 	std::vector<CControl*> Controls;
@@ -88,30 +83,22 @@ class CWindow
 	friend class CControl;
 	friend class CGUI;
 public:
-	inline void SetPosition(int x, int y) { m_x = x; m_y = y; }
-	inline void SetSize(int w, int h) { m_iWidth = w;	m_iHeight = h; }
-	inline void SetTitle(std::string title) { Title = title; }
-	inline void Open() { m_bIsOpen = true; }
-	inline void Close() { m_bIsOpen = false; }
-	inline bool IsOpen() { return m_bIsOpen; }
+	void SetPosition(int x, int y);
+	void SetSize(int w, int h);
+	void SetTitle(std::string title);
+	void Open();
+	void Close();
 	void Toggle();
-	inline CControl* GetFocus() { return FocusedControl; }
+	bool isOpen();
+	CControl* GetFocus();
 
 	void RegisterTab(CTab* Tab);
-	inline void EnableTabs(bool tabs) { m_HasTabs = tabs; }
 
 	RECT GetClientArea();
 	RECT GetTabArea();
-	void inline SetConfigFile(std::string p) { ConfigFilePath = p; }
-	void SaveToCurrentConfig();
 
 private:
 	void DrawControls();
-	std::string ConfigFilePath;
-
-	bool m_bIsOpen;
-
-	bool m_HasTabs;
 
 	std::vector<CTab*> Tabs;
 	CTab* SelectedTab;
@@ -124,8 +111,9 @@ private:
 	int m_y;
 	int m_iWidth;
 	int m_iHeight;
-};
 
+};
+extern bool m_bIsOpen;
 // User interface manager
 class CGUI
 {
@@ -164,10 +152,7 @@ private:
 	bool keys[256];
 	bool oldKeys[256];
 	// Mouse
-	struct MousePoint
-	{
-		int x; int y;
-	} Mouse;
+	POINT Mouse;
 	bool MenuOpen;
 
 	// Window Dragging
