@@ -14,7 +14,7 @@ namespace Offsets
 		enum  BaseClient
 		{
 			CHL_GetAllClasses = 8,
-			CHL_FrameStageNotify = 36
+			CHL_FrameStageNotify = 37
 		};
 
 		enum EngineClient
