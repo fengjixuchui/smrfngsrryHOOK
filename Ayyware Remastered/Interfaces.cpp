@@ -113,7 +113,7 @@ void Interfaces::InterfaceManager::DumpAllInterfaces()
 
 void Interfaces::Initialize()
 {
-	Interfaces::InterfaceManager ClientMan("client.dll");
+	Interfaces::InterfaceManager ClientMan("client_panorama.dll");
 	Interfaces::InterfaceManager EngineMan("engine.dll");
 	Interfaces::InterfaceManager VGUI2Man("vgui2.dll");
 	Interfaces::InterfaceManager MatSurfaceMan("vguimatsurface.dll");
