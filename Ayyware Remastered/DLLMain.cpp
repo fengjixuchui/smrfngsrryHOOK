@@ -200,8 +200,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 		BackEndInfo::g_hModule = hinstDLL;
 
 		BackEndInfo::g_LoaderInfoSet = false;
-		//Ow you find the antipasta thats a good start.
-		//CreateThread(Hack, Aimbot, InitThread, 451, 8, 12);
+		CreateThread(Hack, Aimbot, InitThread, 451, 8, 12); /* wtf are these arguments lmao take a look here -swoopae */
 
 		break;
 	case DLL_PROCESS_DETACH:
