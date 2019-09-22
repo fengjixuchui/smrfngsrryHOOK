@@ -64,7 +64,7 @@ void Hooks::Apply()
 
 	// Meme
 	VMTClient.Initialise((DWORD*)Interfaces::Client);
-	oFrameStageNotify = (FrameStageNotifyFn)VMTClient.HookMethod( (DWORD)&Hooked_FrameStageNotify, 36);
+	oFrameStageNotify = (FrameStageNotifyFn)VMTClient.HookMethod( (DWORD)&Hooked_FrameStageNotify, 37);
 
 #ifdef AYYDBG
 	Utilities::Log("Hooks Applied");
